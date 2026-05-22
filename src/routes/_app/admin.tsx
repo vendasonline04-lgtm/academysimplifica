@@ -252,7 +252,7 @@ function ModuleRow({ module: m, index, lessons, onChange, canUp, canDown, neighb
   };
   const handleAddLesson = async (title: string) => {
     setModal(null);
-    await supabase.from("lessons").insert({ title, module_id: m.id, category_id: m.category_id, panda_embed_url: "", access_tier: m.access_tier, published: false, sort_order: lessons.length });
+    await supabase.from("lessons").insert({ title, module_id: m.id, category_id: m.category_id, panda_embed_url: "", access_tier: m.access_tier, published: true, sort_order: lessons.length });
     onChange();
   };
   const handleDelete = async () => { setModal(null); await supabase.from("modules").delete().eq("id", m.id); onChange(); };
@@ -395,6 +395,7 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
   const qc = useQueryClient();
   const [title, setTitle] = useState(lesson.title);
   const [desc, setDesc] = useState(lesson.description ?? "");
+  const [published, setPublished] = useState(lesson.published);
   const [videoMode, setVideoMode] = useState<"url" | "embed">(
     lesson.panda_embed_url?.startsWith("<") ? "embed" : "url"
   );
@@ -443,7 +444,7 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
 
   const save = async () => {
     const { error } = await supabase.from("lessons").update({
-      title, description: desc, panda_embed_url: videoVal, access_tier: tier,
+      title, description: desc, panda_embed_url: videoVal, access_tier: tier, published,
     }).eq("id", lesson.id);
     if (error) toast.error(error.message); else { toast.success("Aula salva"); qc.invalidateQueries({ queryKey: ["admin-content"] }); onDone(); }
   };
@@ -503,6 +504,14 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
         <Label className="flex items-center gap-1"><Send className="h-3 w-3" /> Comentário/Aviso para alunos</Label>
         <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Escreva um comentário/aviso para os alunos..." rows={2} />
         <Button size="sm" variant="outline" onClick={saveComment}>Publicar aviso</Button>
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg border p-3">
+        <div>
+          <p className="text-sm font-medium">{published ? "Aula publicada" : "Rascunho"}</p>
+          <p className="text-xs text-muted-foreground">{published ? "Visível para os alunos" : "Não aparece para os alunos"}</p>
+        </div>
+        <Switch checked={published} onCheckedChange={setPublished} />
       </div>
 
       <div className="flex gap-2 pt-2 border-t">
