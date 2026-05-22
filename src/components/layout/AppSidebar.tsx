@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Heart, History, LifeBuoy, Crown, ShieldCheck, GraduationCap } from "lucide-react";
+import { LayoutDashboard, Heart, History, LifeBuoy, Crown, ShieldCheck, GraduationCap, UserRound } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -73,14 +73,24 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
               {data?.isAdmin && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={isActive("/admin")}>
-                    <Link to="/admin">
-                      <ShieldCheck />
-                      <span>Admin</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={isActive("/admin")}>
+                      <Link to="/admin">
+                        <ShieldCheck />
+                        <span>Admin</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={false} className="text-muted-foreground hover:text-foreground">
+                      <Link to="/dashboard">
+                        <UserRound />
+                        <span>Ver como Aluno</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </>
               )}
             </SidebarMenu>
           </SidebarGroupContent>
