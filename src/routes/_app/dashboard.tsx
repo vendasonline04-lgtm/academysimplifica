@@ -91,6 +91,7 @@ function CategorySection({ category, modules }: { category: Category; modules: M
               <ModuleCard
                 key={m.id}
                 module={m}
+                fallbackCover={category.cover_url}
                 lessonCount={lessonCount}
                 locked={locked}
                 lockReason={!tierOk ? "tier" : "delay"}
@@ -103,7 +104,7 @@ function CategorySection({ category, modules }: { category: Category; modules: M
   );
 }
 
-function ModuleCard({ module: m, lessonCount, locked, lockReason }: { module: Module; lessonCount: number; locked: boolean; lockReason: "tier" | "delay" }) {
+function ModuleCard({ module: m, fallbackCover, lessonCount, locked, lockReason }: { module: Module; fallbackCover?: string | null; lessonCount: number; locked: boolean; lockReason: "tier" | "delay" }) {
   const target = locked && lockReason === "tier" ? "/upgrade" : `/modulos/${m.id}`;
   return (
     <Link
@@ -113,8 +114,8 @@ function ModuleCard({ module: m, lessonCount, locked, lockReason }: { module: Mo
     >
       <div className="glass-card overflow-hidden rounded-2xl transition hover:shadow-glow">
         <div className="relative aspect-video w-full overflow-hidden bg-muted">
-          {m.cover_url ? (
-            <img src={m.cover_url} alt={m.title} className="h-full w-full object-cover transition group-hover:scale-105" />
+          {(m.cover_url || fallbackCover) ? (
+            <img src={m.cover_url ?? fallbackCover!} alt={m.title} className="h-full w-full object-cover transition group-hover:scale-105" />
           ) : (
             <div className="grid h-full w-full place-items-center gradient-primary text-primary-foreground">
               <PlayCircle className="h-10 w-10 opacity-80" />

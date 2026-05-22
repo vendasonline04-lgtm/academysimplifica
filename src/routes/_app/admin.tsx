@@ -152,13 +152,13 @@ function ContentManager() {
   return (
     <div className="space-y-3">
       {modal?.type === "category" && (
-        <InlineModal title="Nova Categoria" placeholder="Nome da categoria..." onConfirm={handleAddCategory} onCancel={() => setModal(null)} />
+        <InlineModal title="Novo Curso" placeholder="Nome do curso..." onConfirm={handleAddCategory} onCancel={() => setModal(null)} />
       )}
 
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-muted-foreground">Estrutura do Curso</h2>
         <Button onClick={() => setModal({ type: "category" })} className="gradient-primary text-primary-foreground">
-          <Plus className="mr-2 h-4 w-4" /> Nova Categoria
+          <Plus className="mr-2 h-4 w-4" /> Novo Curso
         </Button>
       </div>
 
