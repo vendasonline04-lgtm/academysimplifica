@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppSuporteRouteImport } from './routes/_app/suporte'
 import { Route as AppHistoricoRouteImport } from './routes/_app/historico'
 import { Route as AppFavoritosRouteImport } from './routes/_app/favoritos'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
@@ -30,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppSuporteRoute = AppSuporteRouteImport.update({
+  id: '/suporte',
+  path: '/suporte',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppHistoricoRoute = AppHistoricoRouteImport.update({
   id: '/historico',
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/favoritos': typeof AppFavoritosRoute
   '/historico': typeof AppHistoricoRoute
+  '/suporte': typeof AppSuporteRoute
   '/modulos/$id': typeof AppModulosIdRoute
 }
 export interface FileRoutesByTo {
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardRoute
   '/favoritos': typeof AppFavoritosRoute
   '/historico': typeof AppHistoricoRoute
+  '/suporte': typeof AppSuporteRoute
   '/modulos/$id': typeof AppModulosIdRoute
 }
 export interface FileRoutesById {
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/favoritos': typeof AppFavoritosRoute
   '/_app/historico': typeof AppHistoricoRoute
+  '/_app/suporte': typeof AppSuporteRoute
   '/_app/modulos/$id': typeof AppModulosIdRoute
 }
 export interface FileRouteTypes {
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/favoritos'
     | '/historico'
+    | '/suporte'
     | '/modulos/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/favoritos'
     | '/historico'
+    | '/suporte'
     | '/modulos/$id'
   id:
     | '__root__'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/favoritos'
     | '/_app/historico'
+    | '/_app/suporte'
     | '/_app/modulos/$id'
   fileRoutesById: FileRoutesById
 }
@@ -134,6 +146,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/suporte': {
+      id: '/_app/suporte'
+      path: '/suporte'
+      fullPath: '/suporte'
+      preLoaderRoute: typeof AppSuporteRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/historico': {
       id: '/_app/historico'
@@ -170,6 +189,7 @@ interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppFavoritosRoute: typeof AppFavoritosRoute
   AppHistoricoRoute: typeof AppHistoricoRoute
+  AppSuporteRoute: typeof AppSuporteRoute
   AppModulosIdRoute: typeof AppModulosIdRoute
 }
 
@@ -177,6 +197,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppFavoritosRoute: AppFavoritosRoute,
   AppHistoricoRoute: AppHistoricoRoute,
+  AppSuporteRoute: AppSuporteRoute,
   AppModulosIdRoute: AppModulosIdRoute,
 }
 
