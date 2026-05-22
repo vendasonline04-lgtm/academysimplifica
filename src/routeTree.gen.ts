@@ -11,7 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppUpgradeRouteImport } from './routes/_app/upgrade'
 import { Route as AppSuporteRouteImport } from './routes/_app/suporte'
 import { Route as AppHistoricoRouteImport } from './routes/_app/historico'
@@ -29,10 +29,10 @@ const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
+const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
 const AppUpgradeRoute = AppUpgradeRouteImport.update({
   id: '/upgrade',
@@ -71,7 +71,7 @@ const AppModulosIdRoute = AppModulosIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
   '/auth': typeof AuthRoute
   '/admin': typeof AppAdminRoute
   '/dashboard': typeof AppDashboardRoute
@@ -82,7 +82,6 @@ export interface FileRoutesByFullPath {
   '/modulos/$id': typeof AppModulosIdRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/admin': typeof AppAdminRoute
   '/dashboard': typeof AppDashboardRoute
@@ -90,11 +89,11 @@ export interface FileRoutesByTo {
   '/historico': typeof AppHistoricoRoute
   '/suporte': typeof AppSuporteRoute
   '/upgrade': typeof AppUpgradeRoute
+  '/': typeof AppIndexRoute
   '/modulos/$id': typeof AppModulosIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
   '/_app/admin': typeof AppAdminRoute
@@ -103,6 +102,7 @@ export interface FileRoutesById {
   '/_app/historico': typeof AppHistoricoRoute
   '/_app/suporte': typeof AppSuporteRoute
   '/_app/upgrade': typeof AppUpgradeRoute
+  '/_app/': typeof AppIndexRoute
   '/_app/modulos/$id': typeof AppModulosIdRoute
 }
 export interface FileRouteTypes {
@@ -119,7 +119,6 @@ export interface FileRouteTypes {
     | '/modulos/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
     | '/auth'
     | '/admin'
     | '/dashboard'
@@ -127,10 +126,10 @@ export interface FileRouteTypes {
     | '/historico'
     | '/suporte'
     | '/upgrade'
+    | '/'
     | '/modulos/$id'
   id:
     | '__root__'
-    | '/'
     | '/_app'
     | '/auth'
     | '/_app/admin'
@@ -139,11 +138,11 @@ export interface FileRouteTypes {
     | '/_app/historico'
     | '/_app/suporte'
     | '/_app/upgrade'
+    | '/_app/'
     | '/_app/modulos/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
 }
@@ -164,12 +163,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
+    '/_app/': {
+      id: '/_app/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/upgrade': {
       id: '/_app/upgrade'
@@ -230,6 +229,7 @@ interface AppRouteChildren {
   AppHistoricoRoute: typeof AppHistoricoRoute
   AppSuporteRoute: typeof AppSuporteRoute
   AppUpgradeRoute: typeof AppUpgradeRoute
+  AppIndexRoute: typeof AppIndexRoute
   AppModulosIdRoute: typeof AppModulosIdRoute
 }
 
@@ -240,16 +240,26 @@ const AppRouteChildren: AppRouteChildren = {
   AppHistoricoRoute: AppHistoricoRoute,
   AppSuporteRoute: AppSuporteRoute,
   AppUpgradeRoute: AppUpgradeRoute,
+  AppIndexRoute: AppIndexRoute,
   AppModulosIdRoute: AppModulosIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
