@@ -76,10 +76,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Academy — Sua área de membros" },
       { name: "description", content: "Plataforma de cursos em vídeo com acesso por planos." },
-      { property: "og:title", content: "Academy" },
-      { property: "og:description", content: "Sua área de membros em um só lugar." },
+      { property: "og:title", content: "Academy — Sua área de membros" },
+      { property: "og:description", content: "Plataforma de cursos em vídeo com acesso por planos." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "Academy — Sua área de membros" },
+      { name: "twitter:description", content: "Plataforma de cursos em vídeo com acesso por planos." },
     ],
     links: [
       {
