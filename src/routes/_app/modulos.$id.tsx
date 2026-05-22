@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
 import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { z } from "zod";
-import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { zodValidator } from "@tanstack/zod-adapter";
 import { supabase } from "@/lib/supabase";
 import { useAuth, useCurrentUser, tierAllows, isModuleUnlocked } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ const LessonExtras = lazy(() =>
   import("@/components/LessonExtras").then((m) => ({ default: m.LessonExtras }))
 );
 
-const searchSchema = z.object({ aula: fallback(z.string().optional(), undefined) });
+const searchSchema = z.object({ aula: z.string().optional() });
 
 export const Route = createFileRoute("/_app/modulos/$id")({
   validateSearch: zodValidator(searchSchema),
