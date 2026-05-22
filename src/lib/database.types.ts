@@ -108,23 +108,28 @@ export interface LessonResource {
   created_at: string;
 }
 
-type Row<T> = { Row: T; Insert: Partial<T>; Update: Partial<T> };
+type TableDef<T> = {
+  Row: T;
+  Insert: Partial<T> & Record<string, unknown>;
+  Update: Partial<T> & Record<string, unknown>;
+  Relationships: [];
+};
 
 export interface Database {
   public: {
     Tables: {
-      categories: Row<Category>;
-      modules: Row<Module>;
-      lessons: Row<Lesson>;
-      profiles: Row<Profile>;
-      user_roles: Row<UserRole>;
-      user_subscriptions: Row<UserSubscription>;
-      allowed_emails: Row<AllowedEmail>;
-      lesson_progress: Row<LessonProgress>;
-      lesson_favorites: Row<LessonFavorite>;
-      lesson_comments: Row<LessonComment>;
-      lesson_admin_notes: Row<LessonAdminNote>;
-      lesson_resources: Row<LessonResource>;
+      categories: TableDef<Category>;
+      modules: TableDef<Module>;
+      lessons: TableDef<Lesson>;
+      profiles: TableDef<Profile>;
+      user_roles: TableDef<UserRole>;
+      user_subscriptions: TableDef<UserSubscription>;
+      allowed_emails: TableDef<AllowedEmail>;
+      lesson_progress: TableDef<LessonProgress>;
+      lesson_favorites: TableDef<LessonFavorite>;
+      lesson_comments: TableDef<LessonComment>;
+      lesson_admin_notes: TableDef<LessonAdminNote>;
+      lesson_resources: TableDef<LessonResource>;
     };
     Enums: {
       access_tier: AccessTier;
