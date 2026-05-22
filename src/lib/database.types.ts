@@ -131,6 +131,7 @@ export interface Database {
       lesson_admin_notes: TableDef<LessonAdminNote>;
       lesson_resources: TableDef<LessonResource>;
     };
+    Views: Record<string, never>;
     Enums: {
       access_tier: AccessTier;
       app_role: AppRole;
@@ -141,5 +142,6 @@ export interface Database {
       tier_allows: { Args: { _user_tier: AccessTier; _content_tier: AccessTier }; Returns: boolean };
       is_email_allowed: { Args: { _email: string }; Returns: boolean };
     };
+    CompositeTypes: Record<string, never>;
   };
 }
