@@ -29,6 +29,15 @@ function mapStatus(event: string): "paid" | "refunded" | "canceled" | "pending" 
   return null;
 }
 
+async function getAuthUserByEmail(email: string) {
+  const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1_000 });
+  if (error) {
+    console.error("[webhook] auth users lookup error", error);
+    return null;
+  }
+  return data.users.find((user) => user.email?.toLowerCase() === email) ?? null;
+}
+
 export const Route = createFileRoute("/api/public/cackto/webhook")({
   server: {
     handlers: {
@@ -91,10 +100,10 @@ export const Route = createFileRoute("/api/public/cackto/webhook")({
             );
 
             // Se o aluno já existe, atualiza subscription
-            const { data: authUser } = await supabaseAdmin.auth.admin.getUserByEmail(email);
-            if (authUser?.user) {
+            const authUser = await getAuthUserByEmail(email);
+            if (authUser) {
               await supabaseAdmin.from("user_subscriptions").upsert(
-                { user_id: authUser.user.id, tier, status: "active", payment_provider: "cackto", external_id: orderId },
+                { user_id: authUser.id, tier, status: "active", payment_provider: "cackto", external_id: orderId },
                 { onConflict: "user_id" }
               );
             }
@@ -102,10 +111,10 @@ export const Route = createFileRoute("/api/public/cackto/webhook")({
             await supabaseAdmin.from("allowed_emails")
               .update({ status: "canceled" }).eq("email", email);
 
-            const { data: authUser } = await supabaseAdmin.auth.admin.getUserByEmail(email);
-            if (authUser?.user) {
+            const authUser = await getAuthUserByEmail(email);
+            if (authUser) {
               await supabaseAdmin.from("user_subscriptions")
-                .update({ status: "canceled" }).eq("user_id", authUser.user.id);
+                .update({ status: "canceled" }).eq("user_id", authUser.id);
             }
           }
         }
