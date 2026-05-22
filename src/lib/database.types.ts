@@ -1,13 +1,14 @@
 export type AccessTier = "free" | "basic" | "premium";
 export type AppRole = "admin" | "student";
-export type SubscriptionStatus = "active" | "cancelled" | "expired";
 
 export interface Category {
   id: string;
   title: string;
+  slug: string;
   description: string | null;
   cover_url: string | null;
-  order_index: number;
+  access_tier: AccessTier;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -20,29 +21,30 @@ export interface Module {
   cover_url: string | null;
   access_tier: AccessTier;
   unlock_delay_days: number;
-  order_index: number;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }
 
 export interface Lesson {
   id: string;
-  module_id: string;
+  category_id: string;
+  module_id: string | null;
   title: string;
   description: string | null;
-  cover_url: string | null;
-  panda_embed_url: string | null;
+  panda_embed_url: string;
+  duration_seconds: number | null;
   access_tier: AccessTier;
   published: boolean;
-  order_index: number;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }
 
 export interface Profile {
   id: string;
-  email: string | null;
-  display_name: string | null;
+  user_id: string;
+  full_name: string | null;
   avatar_url: string | null;
   created_at: string;
   updated_at: string;
@@ -52,13 +54,18 @@ export interface UserRole {
   id: string;
   user_id: string;
   role: AppRole;
+  created_at: string;
 }
 
 export interface UserSubscription {
   id: string;
   user_id: string;
   tier: AccessTier;
-  status: SubscriptionStatus;
+  status: string;
+  payment_provider: string | null;
+  external_id: string | null;
+  started_at: string;
+  expires_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -67,8 +74,10 @@ export interface AllowedEmail {
   id: string;
   email: string;
   tier: AccessTier;
-  status: SubscriptionStatus;
+  status: string;
+  external_order_id: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface LessonProgress {
@@ -89,22 +98,27 @@ export interface LessonComment {
   id: string;
   user_id: string;
   lesson_id: string;
-  content: string;
+  parent_id: string | null;
+  body: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface LessonAdminNote {
   id: string;
   lesson_id: string;
-  content: string;
+  body: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface LessonResource {
   id: string;
   lesson_id: string;
   title: string;
-  file_path: string;
+  url: string;
+  kind: string;
+  sort_order: number;
   created_at: string;
 }
 
@@ -139,7 +153,7 @@ export interface Database {
     Functions: {
       has_role: { Args: { _user_id: string; _role: AppRole }; Returns: boolean };
       get_user_tier: { Args: { _user_id: string }; Returns: AccessTier };
-      tier_allows: { Args: { _user_tier: AccessTier; _content_tier: AccessTier }; Returns: boolean };
+      tier_allows: { Args: { _user_id: string; _required: AccessTier }; Returns: boolean };
       is_email_allowed: { Args: { _email: string }; Returns: boolean };
     };
     CompositeTypes: Record<string, never>;

@@ -12,13 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ChevronUp, ChevronDown, Plus, Trash2, Upload, Folder, BookOpen, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
-import type { AccessTier, Category, Module, Lesson, UserSubscription, Profile, SubscriptionStatus } from "@/lib/database.types";
+import type { AccessTier, AppRole, Category, Module, Lesson, UserSubscription, Profile } from "@/lib/database.types";
 
 export const Route = createFileRoute("/_app/admin")({
   beforeLoad: async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw redirect({ to: "/auth" });
-    const { data: isAdmin } = await supabase.rpc("has_role" as never, { _user_id: u.user.id, _role: "admin" } as never);
+    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: u.user.id, _role: "admin" as AppRole });
     if (!isAdmin) throw redirect({ to: "/dashboard" });
   },
   head: () => ({ meta: [{ title: "Admin — Academy" }] }),
@@ -59,9 +59,9 @@ function ContentManager() {
     queryKey: ["admin-content"],
     queryFn: async () => {
       const [c, m, l] = await Promise.all([
-        supabase.from("categories").select("*").order("order_index"),
-        supabase.from("modules").select("*").order("order_index"),
-        supabase.from("lessons").select("*").order("order_index"),
+        supabase.from("categories").select("*").order("sort_order"),
+        supabase.from("modules").select("*").order("sort_order"),
+        supabase.from("lessons").select("*").order("sort_order"),
       ]);
       return {
         categories: (c.data ?? []) as Category[],
@@ -73,8 +73,8 @@ function ContentManager() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-content"] });
 
   const reorder = async (table: "categories" | "modules" | "lessons", id: string, current: number, neighborId: string, neighborOrder: number) => {
-    await supabase.from(table).update({ order_index: neighborOrder }).eq("id", id);
-    await supabase.from(table).update({ order_index: current }).eq("id", neighborId);
+    await supabase.from(table).update({ sort_order: neighborOrder }).eq("id", id);
+    await supabase.from(table).update({ sort_order: current }).eq("id", neighborId);
     invalidate();
   };
 
@@ -82,7 +82,8 @@ function ContentManager() {
     const title = prompt("Nome da categoria:");
     if (!title) return;
     const order = (data?.categories.length ?? 0);
-    const { error } = await supabase.from("categories").insert({ title, order_index: order });
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const { error } = await supabase.from("categories").insert({ title, slug, sort_order: order });
     if (error) toast.error(error.message); else invalidate();
   };
 
@@ -99,7 +100,7 @@ function ContentManager() {
           category={cat}
           modules={data.modules.filter((m) => m.category_id === cat.id)}
           lessons={data.lessons}
-          onReorder={(neighbor) => reorder("categories", cat.id, cat.order_index, neighbor.id, neighbor.order_index)}
+          onReorder={(neighbor) => reorder("categories", cat.id, cat.sort_order, neighbor.id, neighbor.sort_order)}
           canUp={i > 0}
           canDown={i < data.categories.length - 1}
           neighborUp={data.categories[i - 1]}
@@ -126,7 +127,7 @@ function CategoryRow({ category, modules, lessons, onReorder, canUp, canDown, ne
     const title = prompt("Nome do módulo:");
     if (!title) return;
     await supabase.from("modules").insert({
-      title, category_id: category.id, access_tier: "free", unlock_delay_days: 0, order_index: modules.length,
+      title, category_id: category.id, access_tier: "free", unlock_delay_days: 0, sort_order: modules.length,
     });
     onChange();
   };
@@ -167,8 +168,8 @@ function ModuleRow({ module: m, lessons, onChange, neighborUp, neighborDown }: {
   const [edit, setEdit] = useState(false);
 
   const reorder = async (n: Module) => {
-    await supabase.from("modules").update({ order_index: n.order_index }).eq("id", m.id);
-    await supabase.from("modules").update({ order_index: m.order_index }).eq("id", n.id);
+    await supabase.from("modules").update({ sort_order: n.sort_order }).eq("id", m.id);
+    await supabase.from("modules").update({ sort_order: m.sort_order }).eq("id", n.id);
     onChange();
   };
   const remove = async () => {
@@ -180,7 +181,7 @@ function ModuleRow({ module: m, lessons, onChange, neighborUp, neighborDown }: {
     const title = prompt("Nome da aula:");
     if (!title) return;
     await supabase.from("lessons").insert({
-      title, module_id: m.id, access_tier: m.access_tier, published: false, order_index: lessons.length,
+      title, module_id: m.id, category_id: m.category_id, panda_embed_url: "", access_tier: m.access_tier, published: false, sort_order: lessons.length,
     });
     onChange();
   };
@@ -263,8 +264,8 @@ function ModuleEditor({ module: m, onDone }: { module: Module; onDone: () => voi
 function LessonRow({ lesson, onChange, neighborUp, neighborDown }: { lesson: Lesson; onChange: () => void; neighborUp?: Lesson; neighborDown?: Lesson }) {
   const [edit, setEdit] = useState(false);
   const reorder = async (n: Lesson) => {
-    await supabase.from("lessons").update({ order_index: n.order_index }).eq("id", lesson.id);
-    await supabase.from("lessons").update({ order_index: lesson.order_index }).eq("id", n.id);
+    await supabase.from("lessons").update({ sort_order: n.sort_order }).eq("id", lesson.id);
+    await supabase.from("lessons").update({ sort_order: lesson.sort_order }).eq("id", n.id);
     onChange();
   };
   const togglePub = async () => {
@@ -298,19 +299,12 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
   const [desc, setDesc] = useState(lesson.description ?? "");
   const [embed, setEmbed] = useState(lesson.panda_embed_url ?? "");
   const [tier, setTier] = useState<AccessTier>(lesson.access_tier);
-  const [cover, setCover] = useState(lesson.cover_url ?? "");
-
   const save = async () => {
     const { error } = await supabase.from("lessons").update({
-      title, description: desc, panda_embed_url: embed, access_tier: tier, cover_url: cover || null,
+      title, description: desc, panda_embed_url: embed, access_tier: tier,
     }).eq("id", lesson.id);
     if (error) toast.error(error.message); else { toast.success("Salvo"); onDone(); }
   };
-  const onUpload = async (f: File) => {
-    const url = await uploadCover(f);
-    if (url) setCover(url);
-  };
-
   return (
     <div className="mt-2 space-y-3 rounded-md border bg-background p-3">
       <div className="grid gap-3 md:grid-cols-2">
@@ -328,13 +322,6 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
         </div>
       </div>
       <div><Label>Embed URL (Panda)</Label><Input value={embed} onChange={(e) => setEmbed(e.target.value)} placeholder="https://..." /></div>
-      <div>
-        <Label>Capa</Label>
-        <div className="flex items-center gap-2">
-          <Input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
-          {cover && <img src={cover} alt="" className="h-10 w-16 rounded object-cover" />}
-        </div>
-      </div>
       <div><Label>Descrição</Label><Textarea value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
       <div className="flex gap-2">
         <Button onClick={save} className="gradient-primary text-primary-foreground"><Upload className="mr-1 h-3 w-3" />Salvar</Button>
@@ -368,12 +355,12 @@ function SubscriptionsManager() {
     invalidate();
   };
   const cancel = async (id: string) => {
-    await supabase.from("user_subscriptions").update({ status: "cancelled" as SubscriptionStatus }).eq("id", id);
+    await supabase.from("user_subscriptions").update({ status: "canceled" }).eq("id", id);
     invalidate();
   };
 
   if (!data) return <div className="text-muted-foreground">Carregando...</div>;
-  const profileById = (uid: string) => data.profiles.find((p) => p.id === uid);
+  const profileById = (uid: string) => data.profiles.find((p) => p.user_id === uid);
 
   return (
     <div className="glass-card overflow-hidden rounded-2xl">
@@ -392,7 +379,7 @@ function SubscriptionsManager() {
             const p = profileById(s.user_id);
             return (
               <tr key={s.id} className="border-b">
-                <td className="p-3">{p?.email ?? p?.display_name ?? s.user_id.slice(0, 8)}</td>
+                <td className="p-3">{p?.full_name ?? s.user_id.slice(0, 8)}</td>
                 <td className="p-3">
                   <Select value={s.tier} onValueChange={(v) => updateTier(s.id, v as AccessTier)}>
                     <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
@@ -426,9 +413,9 @@ function StructureView() {
     queryKey: ["admin-content"],
     queryFn: async () => {
       const [c, m, l] = await Promise.all([
-        supabase.from("categories").select("*").order("order_index"),
-        supabase.from("modules").select("*").order("order_index"),
-        supabase.from("lessons").select("*").order("order_index"),
+        supabase.from("categories").select("*").order("sort_order"),
+        supabase.from("modules").select("*").order("sort_order"),
+        supabase.from("lessons").select("*").order("sort_order"),
       ]);
       return {
         categories: (c.data ?? []) as Category[],

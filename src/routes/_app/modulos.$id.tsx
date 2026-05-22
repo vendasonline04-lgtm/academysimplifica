@@ -31,7 +31,7 @@ function ModulePage() {
     queryFn: async () => {
       const [modRes, lessonsRes] = await Promise.all([
         supabase.from("modules").select("*").eq("id", id).maybeSingle(),
-        supabase.from("lessons").select("*").eq("module_id", id).eq("published", true).order("order_index"),
+        supabase.from("lessons").select("*").eq("module_id", id).eq("published", true).order("sort_order"),
       ]);
       return {
         module: modRes.data as Module | null,
@@ -158,7 +158,7 @@ function LessonView({ lesson, userId }: { lesson: Lesson; userId: string | null 
     const { error } = await supabase.from("lesson_comments").insert({
       lesson_id: lesson.id,
       user_id: userId,
-      content: comment.trim(),
+      body: comment.trim(),
     });
     if (error) {
       toast.error(error.message);
@@ -169,7 +169,7 @@ function LessonView({ lesson, userId }: { lesson: Lesson; userId: string | null 
   };
 
   const downloadResource = async (res: LessonResource) => {
-    const { data, error } = await supabase.storage.from("lesson-files").createSignedUrl(res.file_path, 3600);
+    const { data, error } = await supabase.storage.from("lesson-files").createSignedUrl(res.url, 3600);
     if (error || !data) return toast.error("Não foi possível gerar o link");
     window.open(data.signedUrl, "_blank");
   };
@@ -249,7 +249,7 @@ function LessonView({ lesson, userId }: { lesson: Lesson; userId: string | null 
           {meta?.comments.length === 0 && <p className="text-sm text-muted-foreground">Seja o primeiro a comentar.</p>}
           {meta?.comments.map((c) => (
             <div key={c.id} className="rounded-lg border bg-background/50 p-3 text-sm">
-              <p className="whitespace-pre-line">{c.content}</p>
+              <p className="whitespace-pre-line">{c.body}</p>
               <p className="mt-1 text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString("pt-BR")}</p>
             </div>
           ))}

@@ -20,8 +20,8 @@ function Dashboard() {
     queryKey: ["dashboard-content"],
     queryFn: async () => {
       const [cats, mods] = await Promise.all([
-        supabase.from("categories").select("*").order("order_index"),
-        supabase.from("modules").select("*, lessons(count)").order("order_index"),
+        supabase.from("categories").select("*").order("sort_order"),
+        supabase.from("modules").select("*, lessons(count)").order("sort_order"),
       ]);
       return {
         categories: (cats.data ?? []) as Category[],
