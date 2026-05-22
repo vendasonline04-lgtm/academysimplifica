@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ChevronUp, ChevronDown, Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Calendar } from "lucide-react";
+import { Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Calendar, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import type { AccessTier, AppRole, Category, Module, Lesson, UserSubscription, Profile } from "@/lib/database.types";
 
@@ -59,8 +59,64 @@ async function uploadCover(file: File): Promise<string | null> {
   return data.publicUrl;
 }
 
+/* Modal estilizado — substitui window.prompt/confirm */
+function InlineModal({ title, placeholder, onConfirm, onCancel }: {
+  title: string; placeholder: string;
+  onConfirm: (value: string) => void; onCancel: () => void;
+}) {
+  const [value, setValue] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm space-y-4">
+        <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+        <Input
+          autoFocus value={value} placeholder={placeholder}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && value.trim()) onConfirm(value.trim()); if (e.key === "Escape") onCancel(); }}
+        />
+        <div className="flex gap-2 justify-end">
+          <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
+          <Button disabled={!value.trim()} onClick={() => onConfirm(value.trim())} className="gradient-primary text-primary-foreground">Confirmar</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Modal de confirmação */
+function ConfirmModal({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm space-y-4">
+        <p className="text-sm text-foreground">{message}</p>
+        <div className="flex gap-2 justify-end">
+          <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
+          <Button variant="destructive" onClick={onConfirm}>Excluir</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Handle de reordenação */
+function ReorderHandle({ canUp, canDown, onUp, onDown }: { canUp: boolean; canDown: boolean; onUp: () => void; onDown: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center w-5 shrink-0 cursor-pointer select-none opacity-40 hover:opacity-100 transition-opacity">
+      <button onClick={onUp} disabled={!canUp} className="h-3.5 w-full flex items-end justify-center pb-px disabled:opacity-20 hover:text-primary">
+        <ChevronUp className="h-3 w-3" />
+      </button>
+      <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+      <button onClick={onDown} disabled={!canDown} className="h-3.5 w-full flex items-start justify-center pt-px disabled:opacity-20 hover:text-primary">
+        <ChevronDown className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
 function ContentManager() {
   const qc = useQueryClient();
+  const [modal, setModal] = useState<{ type: "category" } | null>(null);
+
   const { data } = useQuery({
     queryKey: ["admin-content"],
     queryFn: async () => {
@@ -84,22 +140,28 @@ function ContentManager() {
     invalidate();
   };
 
-  const addCategory = async () => {
-    const title = prompt("Nome da categoria:");
-    if (!title) return;
-    const order = (data?.categories.length ?? 0);
+  const handleAddCategory = async (title: string) => {
+    setModal(null);
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const { error } = await supabase.from("categories").insert({ title, slug, sort_order: order });
+    const { error } = await supabase.from("categories").insert({ title, slug, sort_order: data?.categories.length ?? 0 });
     if (error) toast.error(error.message); else invalidate();
   };
 
   if (!data) return <div className="text-muted-foreground">Carregando...</div>;
 
   return (
-    <div className="space-y-4">
-      <Button onClick={addCategory} className="gradient-primary text-primary-foreground">
-        <Plus className="mr-2 h-4 w-4" /> Nova categoria
-      </Button>
+    <div className="space-y-3">
+      {modal?.type === "category" && (
+        <InlineModal title="Nova Categoria" placeholder="Nome da categoria..." onConfirm={handleAddCategory} onCancel={() => setModal(null)} />
+      )}
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-muted-foreground">Estrutura do Curso</h2>
+        <Button onClick={() => setModal({ type: "category" })} className="gradient-primary text-primary-foreground">
+          <Plus className="mr-2 h-4 w-4" /> Nova Categoria
+        </Button>
+      </div>
+
       {data.categories.map((cat, i) => (
         <CategoryRow
           key={cat.id}
@@ -125,94 +187,108 @@ function CategoryRow({ category, modules, lessons, onReorder, canUp, canDown, ne
 }) {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState(false);
-  const remove = async () => {
-    if (!confirm("Excluir categoria e tudo dentro?")) return;
-    await supabase.from("categories").delete().eq("id", category.id);
+  const [modal, setModal] = useState<"module" | "delete" | null>(null);
+
+  const handleAddModule = async (title: string) => {
+    setModal(null);
+    await supabase.from("modules").insert({ title, category_id: category.id, access_tier: "free", unlock_delay_days: 0, sort_order: modules.length });
     onChange();
   };
-  const addModule = async () => {
-    const title = prompt("Nome do módulo:");
-    if (!title) return;
-    await supabase.from("modules").insert({
-      title, category_id: category.id, access_tier: "free", unlock_delay_days: 0, sort_order: modules.length,
-    });
-    onChange();
-  };
+  const handleDelete = async () => { setModal(null); await supabase.from("categories").delete().eq("id", category.id); onChange(); };
 
   return (
-    <div className="glass-card rounded-xl p-4">
-      <div className="flex items-center gap-2">
-        <Folder className="h-4 w-4 text-primary" />
-        <button onClick={() => setOpen(!open)} className="flex-1 text-left font-semibold">{category.title}</button>
-        <Button size="icon" variant="ghost" disabled={!canUp} onClick={() => neighborUp && onReorder(neighborUp)}><ChevronUp className="h-4 w-4" /></Button>
-        <Button size="icon" variant="ghost" disabled={!canDown} onClick={() => neighborDown && onReorder(neighborDown)}><ChevronDown className="h-4 w-4" /></Button>
-        <Button size="icon" variant="ghost" onClick={() => setEdit(!edit)}><Pencil className="h-4 w-4" /></Button>
-        <Button size="icon" variant="ghost" onClick={remove}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+    <div className="rounded-xl border bg-white shadow-sm">
+      {modal === "module" && <InlineModal title="Novo Módulo" placeholder="Nome do módulo..." onConfirm={handleAddModule} onCancel={() => setModal(null)} />}
+      {modal === "delete" && <ConfirmModal message="Excluir categoria e tudo dentro?" onConfirm={handleDelete} onCancel={() => setModal(null)} />}
+
+      <div className="flex items-center gap-2 p-3">
+        <ReorderHandle canUp={canUp} canDown={canDown} onUp={() => neighborUp && onReorder(neighborUp)} onDown={() => neighborDown && onReorder(neighborDown)} />
+        <button onClick={() => setOpen(!open)} className="flex items-center justify-center w-6 h-6 shrink-0 text-primary font-bold text-lg leading-none">
+          {open ? "−" : "+"}
+        </button>
+        <Folder className="h-4 w-4 text-primary shrink-0" />
+        <span className="flex-1 font-semibold text-sm">{category.title}</span>
+        <span className="text-xs text-muted-foreground">{modules.length} módulos</span>
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEdit(!edit)}><Pencil className="h-3.5 w-3.5" /></Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setModal("delete")}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
       </div>
-      {edit && <CategoryEditor category={category} onDone={() => { setEdit(false); onChange(); }} />}
+
+      {edit && <div className="px-3 pb-3"><CategoryEditor category={category} onDone={() => { setEdit(false); onChange(); }} /></div>}
+
       {open && (
-        <div className="ml-6 mt-3 space-y-2 border-l pl-4">
-          <Button size="sm" variant="outline" onClick={addModule}><Plus className="mr-1 h-3 w-3" /> Novo módulo</Button>
+        <div className="border-t mx-3 mb-3">
           {modules.map((m, i) => (
             <ModuleRow
-              key={m.id}
-              module={m}
+              key={m.id} module={m} index={i + 1}
               lessons={lessons.filter((l) => l.module_id === m.id)}
               onChange={onChange}
-              neighborUp={modules[i - 1]}
-              neighborDown={modules[i + 1]}
+              canUp={i > 0} canDown={i < modules.length - 1}
+              neighborUp={modules[i - 1]} neighborDown={modules[i + 1]}
             />
           ))}
+          <div className="pt-2">
+            <Button size="sm" variant="outline" onClick={() => setModal("module")} className="w-full border-dashed text-muted-foreground hover:text-primary">
+              <Plus className="mr-1 h-3 w-3" /> Novo Módulo
+            </Button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function ModuleRow({ module: m, lessons, onChange, neighborUp, neighborDown }: {
-  module: Module; lessons: Lesson[]; onChange: () => void;
-  neighborUp?: Module; neighborDown?: Module;
+function ModuleRow({ module: m, index, lessons, onChange, canUp, canDown, neighborUp, neighborDown }: {
+  module: Module; index: number; lessons: Lesson[]; onChange: () => void;
+  canUp: boolean; canDown: boolean; neighborUp?: Module; neighborDown?: Module;
 }) {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState(false);
+  const [modal, setModal] = useState<"lesson" | "delete" | null>(null);
 
   const reorder = async (n: Module) => {
     await supabase.from("modules").update({ sort_order: n.sort_order }).eq("id", m.id);
     await supabase.from("modules").update({ sort_order: m.sort_order }).eq("id", n.id);
     onChange();
   };
-  const remove = async () => {
-    if (!confirm("Excluir módulo?")) return;
-    await supabase.from("modules").delete().eq("id", m.id);
+  const handleAddLesson = async (title: string) => {
+    setModal(null);
+    await supabase.from("lessons").insert({ title, module_id: m.id, category_id: m.category_id, panda_embed_url: "", access_tier: m.access_tier, published: false, sort_order: lessons.length });
     onChange();
   };
-  const addLesson = async () => {
-    const title = prompt("Nome da aula:");
-    if (!title) return;
-    await supabase.from("lessons").insert({
-      title, module_id: m.id, category_id: m.category_id, panda_embed_url: "", access_tier: m.access_tier, published: false, sort_order: lessons.length,
-    });
-    onChange();
-  };
+  const handleDelete = async () => { setModal(null); await supabase.from("modules").delete().eq("id", m.id); onChange(); };
 
   return (
-    <div className="rounded-lg border bg-background/40 p-3">
-      <div className="flex items-center gap-2">
-        <BookOpen className="h-4 w-4 text-primary" />
-        <button onClick={() => setOpen(!open)} className="flex-1 text-left text-sm font-medium">{m.title}</button>
-        <Badge variant="secondary" className="text-[10px] uppercase">{m.access_tier}</Badge>
-        <Button size="icon" variant="ghost" disabled={!neighborUp} onClick={() => neighborUp && reorder(neighborUp)}><ChevronUp className="h-4 w-4" /></Button>
-        <Button size="icon" variant="ghost" disabled={!neighborDown} onClick={() => neighborDown && reorder(neighborDown)}><ChevronDown className="h-4 w-4" /></Button>
-        <Button size="sm" variant="ghost" onClick={() => setEdit(!edit)}>Editar</Button>
-        <Button size="icon" variant="ghost" onClick={remove}><Trash2 className="h-4 w-4" /></Button>
+    <div className="mt-2 rounded-lg border bg-background/50">
+      {modal === "lesson" && <InlineModal title="Nova Aula" placeholder="Nome da aula..." onConfirm={handleAddLesson} onCancel={() => setModal(null)} />}
+      {modal === "delete" && <ConfirmModal message="Excluir módulo e suas aulas?" onConfirm={handleDelete} onCancel={() => setModal(null)} />}
+
+      <div className="flex items-center gap-2 p-2.5">
+        <ReorderHandle canUp={canUp} canDown={canDown} onUp={() => neighborUp && reorder(neighborUp)} onDown={() => neighborDown && reorder(neighborDown)} />
+        <button onClick={() => setOpen(!open)} className="flex items-center justify-center w-5 h-5 shrink-0 text-primary font-bold leading-none text-base">
+          {open ? "−" : "+"}
+        </button>
+        <BookOpen className="h-3.5 w-3.5 text-primary shrink-0" />
+        <span className="font-bold text-primary text-xs mr-1">{index}.</span>
+        <span className="flex-1 text-sm font-medium">{m.title}</span>
+        <span className="text-xs text-muted-foreground">{lessons.length} aulas</span>
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEdit(!edit)}><Pencil className="h-3.5 w-3.5" /></Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setModal("delete")}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
       </div>
-      {edit && <ModuleEditor module={m} onDone={() => { setEdit(false); onChange(); }} />}
+
+      {edit && <div className="px-3 pb-3 border-t pt-3"><ModuleEditor module={m} onDone={() => { setEdit(false); onChange(); }} /></div>}
+
       {open && (
-        <div className="ml-6 mt-3 space-y-2 border-l pl-4">
-          <Button size="sm" variant="outline" onClick={addLesson}><Plus className="mr-1 h-3 w-3" /> Nova aula</Button>
+        <div className="border-t px-2 pb-2">
           {lessons.map((l, i) => (
-            <LessonRow key={l.id} lesson={l} onChange={onChange} neighborUp={lessons[i - 1]} neighborDown={lessons[i + 1]} />
+            <LessonRow key={l.id} lesson={l} index={i + 1} onChange={onChange}
+              canUp={i > 0} canDown={i < lessons.length - 1}
+              neighborUp={lessons[i - 1]} neighborDown={lessons[i + 1]} />
           ))}
+          <div className="pt-1">
+            <Button size="sm" variant="outline" onClick={() => setModal("lesson")} className="w-full border-dashed text-muted-foreground hover:text-primary text-xs">
+              <Plus className="mr-1 h-3 w-3" /> Nova Aula
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -284,35 +360,33 @@ function ModuleEditor({ module: m, onDone }: { module: Module; onDone: () => voi
   );
 }
 
-function LessonRow({ lesson, onChange, neighborUp, neighborDown }: { lesson: Lesson; onChange: () => void; neighborUp?: Lesson; neighborDown?: Lesson }) {
+function LessonRow({ lesson, index, onChange, canUp, canDown, neighborUp, neighborDown }: {
+  lesson: Lesson; index: number; onChange: () => void;
+  canUp: boolean; canDown: boolean; neighborUp?: Lesson; neighborDown?: Lesson;
+}) {
   const [edit, setEdit] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const reorder = async (n: Lesson) => {
     await supabase.from("lessons").update({ sort_order: n.sort_order }).eq("id", lesson.id);
     await supabase.from("lessons").update({ sort_order: lesson.sort_order }).eq("id", n.id);
     onChange();
   };
-  const togglePub = async () => {
-    await supabase.from("lessons").update({ published: !lesson.published }).eq("id", lesson.id);
-    onChange();
-  };
-  const remove = async () => {
-    if (!confirm("Excluir aula?")) return;
-    await supabase.from("lessons").delete().eq("id", lesson.id);
-    onChange();
-  };
+  const handleDelete = async () => { setConfirmDelete(false); await supabase.from("lessons").delete().eq("id", lesson.id); onChange(); };
 
   return (
-    <div className="rounded-md border bg-background/60 p-2">
-      <div className="flex items-center gap-2">
-        <PlayCircle className="h-4 w-4 text-primary" />
+    <div className="mt-1.5 rounded-md border bg-background/70">
+      {confirmDelete && <ConfirmModal message="Excluir esta aula?" onConfirm={handleDelete} onCancel={() => setConfirmDelete(false)} />}
+      <div className="flex items-center gap-2 px-2 py-2">
+        <ReorderHandle canUp={canUp} canDown={canDown} onUp={() => neighborUp && reorder(neighborUp)} onDown={() => neighborDown && reorder(neighborDown)} />
+        <PlayCircle className="h-3.5 w-3.5 text-green-600 shrink-0" />
+        <span className="font-bold text-green-600 text-xs mr-1">{index}.</span>
         <span className="flex-1 text-sm">{lesson.title}</span>
-        <Switch checked={lesson.published} onCheckedChange={togglePub} />
-        <Button size="icon" variant="ghost" disabled={!neighborUp} onClick={() => neighborUp && reorder(neighborUp)}><ChevronUp className="h-4 w-4" /></Button>
-        <Button size="icon" variant="ghost" disabled={!neighborDown} onClick={() => neighborDown && reorder(neighborDown)}><ChevronDown className="h-4 w-4" /></Button>
-        <Button size="sm" variant="ghost" onClick={() => setEdit(!edit)}>Editar</Button>
-        <Button size="icon" variant="ghost" onClick={remove}><Trash2 className="h-4 w-4" /></Button>
+        {!lesson.published && <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">rascunho</span>}
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEdit(!edit)}><Pencil className="h-3.5 w-3.5" /></Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setConfirmDelete(true)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
       </div>
-      {edit && <LessonEditor lesson={lesson} onDone={() => { setEdit(false); onChange(); }} />}
+      {edit && <div className="border-t px-3 py-3"><LessonEditor lesson={lesson} onDone={() => { setEdit(false); onChange(); }} /></div>}
     </div>
   );
 }
