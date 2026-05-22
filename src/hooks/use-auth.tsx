@@ -48,13 +48,13 @@ export function useCurrentUser() {
     queryFn: async () => {
       if (!user) return null;
       const [tierRes, adminRes, subRes] = await Promise.all([
-        supabase.rpc("get_user_tier", { _user_id: user.id }),
-        supabase.rpc("has_role", { _user_id: user.id, _role: "admin" }),
+        supabase.rpc("get_user_tier" as never, { _user_id: user.id } as never),
+        supabase.rpc("has_role" as never, { _user_id: user.id, _role: "admin" } as never),
         supabase.from("user_subscriptions").select("*").eq("user_id", user.id).maybeSingle(),
       ]);
       return {
         user,
-        tier: (tierRes.data as AccessTier) ?? "free",
+        tier: ((tierRes.data as AccessTier | null) ?? "free") as AccessTier,
         isAdmin: !!adminRes.data,
         subscription: (subRes.data ?? null) as UserSubscription | null,
       };
