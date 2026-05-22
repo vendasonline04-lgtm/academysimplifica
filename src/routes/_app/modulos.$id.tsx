@@ -179,13 +179,20 @@ function LessonView({ lesson, userId }: { lesson: Lesson; userId: string | null 
       <div className="glass-card overflow-hidden rounded-2xl">
         <div className="aspect-video w-full bg-black">
           {lesson.panda_embed_url ? (
-            <iframe
-              src={lesson.panda_embed_url}
-              className="h-full w-full"
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowFullScreen
-              title={lesson.title}
-            />
+            lesson.panda_embed_url.trimStart().startsWith("<") ? (
+              <div
+                dangerouslySetInnerHTML={{ __html: lesson.panda_embed_url }}
+                className="h-full w-full [&>iframe]:h-full [&>iframe]:w-full [&>iframe]:border-none"
+              />
+            ) : (
+              <iframe
+                src={lesson.panda_embed_url}
+                className="h-full w-full"
+                allow="accelerometer; gyroscope; autoplay; fullscreen; picture-in-picture; encrypted-media"
+                allowFullScreen
+                title={lesson.title}
+              />
+            )
           ) : (
             <div className="grid h-full w-full place-items-center text-muted-foreground">
               <PlayCircle className="h-12 w-12 opacity-50" />
