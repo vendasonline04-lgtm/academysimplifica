@@ -1,6 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useQuery, useQueryClient, useQueryClient as useQC } from "@tanstack/react-query";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import type { FormState, CreatedPayload } from "@/components/flow/types";
+import { slugify as flowSlugify } from "@/components/flow/helpers";
+
+const FlowBuilder = lazy(() => import("@/components/FlowBuilder").then((m) => ({ default: m.FlowBuilder })));
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -10,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ChevronUp, ChevronDown, Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import type { AccessTier, AppRole, Category, Module, Lesson, UserSubscription, Profile } from "@/lib/database.types";
 
@@ -118,6 +122,7 @@ function CategoryRow({ category, modules, lessons, onReorder, canUp, canDown, ne
   canUp: boolean; canDown: boolean; neighborUp?: Category; neighborDown?: Category; onChange: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState(false);
   const remove = async () => {
     if (!confirm("Excluir categoria e tudo dentro?")) return;
     await supabase.from("categories").delete().eq("id", category.id);
@@ -139,8 +144,10 @@ function CategoryRow({ category, modules, lessons, onReorder, canUp, canDown, ne
         <button onClick={() => setOpen(!open)} className="flex-1 text-left font-semibold">{category.title}</button>
         <Button size="icon" variant="ghost" disabled={!canUp} onClick={() => neighborUp && onReorder(neighborUp)}><ChevronUp className="h-4 w-4" /></Button>
         <Button size="icon" variant="ghost" disabled={!canDown} onClick={() => neighborDown && onReorder(neighborDown)}><ChevronDown className="h-4 w-4" /></Button>
-        <Button size="icon" variant="ghost" onClick={remove}><Trash2 className="h-4 w-4" /></Button>
+        <Button size="icon" variant="ghost" onClick={() => setEdit(!edit)}><Pencil className="h-4 w-4" /></Button>
+        <Button size="icon" variant="ghost" onClick={remove}><Trash2 className="h-4 w-4 text-destructive" /></Button>
       </div>
+      {edit && <CategoryEditor category={category} onDone={() => { setEdit(false); onChange(); }} />}
       {open && (
         <div className="ml-6 mt-3 space-y-2 border-l pl-4">
           <Button size="sm" variant="outline" onClick={addModule}><Plus className="mr-1 h-3 w-3" /> Novo módulo</Button>
@@ -430,6 +437,49 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
   );
 }
 
+function CategoryEditor({ category, onDone }: { category: Category; onDone: () => void }) {
+  const [title, setTitle] = useState(category.title);
+  const [desc, setDesc] = useState(category.description ?? "");
+  const [tier, setTier] = useState<AccessTier>(category.access_tier);
+  const [cover, setCover] = useState(category.cover_url ?? "");
+  const onUpload = async (f: File) => { const url = await uploadCover(f); if (url) setCover(url); };
+  const save = async () => {
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const { error } = await supabase.from("categories").update({ title, slug, description: desc, access_tier: tier, cover_url: cover || null }).eq("id", category.id);
+    if (error) toast.error(error.message); else { toast.success("Tema salvo"); onDone(); }
+  };
+  return (
+    <div className="mt-3 space-y-3 rounded-md border bg-background p-3">
+      <div className="grid gap-3 md:grid-cols-2">
+        <div><Label>Título</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
+        <div>
+          <Label>Acesso</Label>
+          <Select value={tier} onValueChange={(v) => setTier(v as AccessTier)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="free">Free</SelectItem>
+              <SelectItem value="basic">Básico</SelectItem>
+              <SelectItem value="premium">Premium</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label>Capa</Label>
+        <div className="flex items-center gap-2 mt-1">
+          <Input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
+          {cover && <img src={cover} alt="" className="h-10 w-16 rounded object-cover" />}
+        </div>
+      </div>
+      <div><Label>Descrição</Label><Textarea value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
+      <div className="flex gap-2">
+        <Button onClick={save} className="gradient-primary text-primary-foreground">Salvar</Button>
+        <Button variant="ghost" onClick={onDone}>Cancelar</Button>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------- Subscriptions ------------------- */
 
 function SubscriptionsManager() {
@@ -508,6 +558,7 @@ function SubscriptionsManager() {
 /* ------------------- Structure View (Flow Diagram) ------------------- */
 
 function StructureView() {
+  const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ["admin-content"],
     queryFn: async () => {
@@ -523,91 +574,91 @@ function StructureView() {
       };
     },
   });
+
+  const [form, setForm] = useState<FormState | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const cats = data?.categories ?? [];
+  const mods = data?.modules ?? [];
+  const lsns = data?.lessons ?? [];
+  const reload = () => qc.invalidateQueries({ queryKey: ["admin-content"] });
+
+  const openCreate = useCallback((kind: FormState["kind"], parentId?: string, categoryId?: string) => {
+    const sortOrder = kind === "category" ? cats.length : kind === "module" ? mods.filter((m) => m.category_id === parentId).length : lsns.filter((l) => l.module_id === parentId).length;
+    setForm({ mode: "create", kind, parentId, categoryId, title: "", tier: "free", panda_embed_url: "", description: "", cover_url: null, slug: "", sort_order: sortOrder, unlock_delay_days: 0 });
+  }, [cats, mods, lsns]);
+
+  const openEdit = useCallback((kind: FormState["kind"], recordId: string) => {
+    if (kind === "category") {
+      const cat = cats.find((c) => c.id === recordId); if (!cat) return;
+      setForm({ mode: "edit", kind: "category", recordId, title: cat.title, tier: cat.access_tier, slug: cat.slug, description: cat.description ?? "", cover_url: cat.cover_url, sort_order: cat.sort_order });
+    } else if (kind === "module") {
+      const mod = mods.find((m) => m.id === recordId); if (!mod) return;
+      setForm({ mode: "edit", kind: "module", recordId, parentId: mod.category_id, title: mod.title, tier: mod.access_tier, description: mod.description ?? "", cover_url: mod.cover_url, sort_order: mod.sort_order, unlock_delay_days: mod.unlock_delay_days ?? 0 });
+    } else {
+      const lsn = lsns.find((l) => l.id === recordId); if (!lsn) return;
+      setForm({ mode: "edit", kind: "lesson", recordId, parentId: lsn.module_id ?? undefined, categoryId: lsn.category_id, title: lsn.title, tier: lsn.access_tier, panda_embed_url: lsn.panda_embed_url, sort_order: lsn.sort_order });
+    }
+  }, [cats, mods, lsns]);
+
+  const handleSave = useCallback(async (f: FormState) => {
+    if (!f.title.trim()) return;
+    setSaving(true);
+    try {
+      if (f.mode === "create") {
+        if (f.kind === "category") {
+          const { error } = await supabase.from("categories").insert({ title: f.title, slug: f.slug || flowSlugify(f.title), description: f.description || null, cover_url: f.cover_url ?? null, sort_order: f.sort_order ?? cats.length, access_tier: f.tier });
+          if (error) throw error; toast.success("Tema criado!");
+        } else if (f.kind === "module") {
+          const { error } = await supabase.from("modules").insert({ title: f.title, category_id: f.parentId!, description: f.description || null, cover_url: f.cover_url ?? null, sort_order: f.sort_order ?? 0, access_tier: f.tier, unlock_delay_days: f.unlock_delay_days ?? 0 });
+          if (error) throw error; toast.success("Módulo criado!");
+        } else {
+          const { error } = await supabase.from("lessons").insert({ title: f.title, module_id: f.parentId!, category_id: f.categoryId!, panda_embed_url: f.panda_embed_url ?? "", sort_order: f.sort_order ?? 0, published: true, access_tier: f.tier });
+          if (error) throw error; toast.success("Aula criada!");
+        }
+      } else {
+        if (f.kind === "category") {
+          const { error } = await supabase.from("categories").update({ title: f.title, access_tier: f.tier, slug: f.slug || flowSlugify(f.title), description: f.description || null, cover_url: f.cover_url ?? null, sort_order: f.sort_order ?? 0 }).eq("id", f.recordId!);
+          if (error) throw error; toast.success("Tema atualizado!");
+        } else if (f.kind === "module") {
+          const { error } = await supabase.from("modules").update({ title: f.title, access_tier: f.tier, description: f.description || null, cover_url: f.cover_url ?? null, sort_order: f.sort_order ?? 0, unlock_delay_days: f.unlock_delay_days ?? 0 }).eq("id", f.recordId!);
+          if (error) throw error; toast.success("Módulo atualizado!");
+        } else {
+          const { error } = await supabase.from("lessons").update({ title: f.title, access_tier: f.tier, panda_embed_url: f.panda_embed_url ?? "", sort_order: f.sort_order ?? 0 }).eq("id", f.recordId!);
+          if (error) throw error; toast.success("Aula atualizada!");
+        }
+      }
+      setForm(null); reload();
+    } catch (e: any) { toast.error(e.message ?? "Erro ao salvar"); }
+    finally { setSaving(false); }
+  }, [cats, mods, lsns]);
+
+  const handleDelete = useCallback(async () => {
+    if (!form?.recordId) return;
+    if (!confirm(form.kind === "category" ? "Excluir tema e tudo dentro?" : form.kind === "module" ? "Excluir módulo e aulas?" : "Excluir aula?")) return;
+    setSaving(true);
+    const table = form.kind === "category" ? "categories" : form.kind === "module" ? "modules" : "lessons";
+    const { error } = await supabase.from(table).delete().eq("id", form.recordId);
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Excluído!"); setForm(null); reload();
+  }, [form]);
   if (!data) return <div className="text-muted-foreground">Carregando...</div>;
 
-  const totalLessons = data.lessons.length;
-  const TIER_COLOR: Record<string, string> = { free: "bg-green-100 text-green-800", basic: "bg-blue-100 text-blue-800", premium: "bg-purple-100 text-purple-800" };
-
   return (
-    <div className="space-y-4">
-      {/* Stats bar */}
-      <div className="flex items-center gap-4 text-sm">
-        <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-purple-500 inline-block" /> Temas: {data.categories.length}</span>
-        <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-blue-500 inline-block" /> Módulos: {data.modules.length}</span>
-        <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-green-500 inline-block" /> Aulas: {totalLessons}</span>
-      </div>
-
-      {/* Flow columns */}
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-0 min-w-max">
-          {/* TEMAS column */}
-          <div className="flex flex-col gap-3 w-52">
-            <div className="text-xs font-bold uppercase tracking-widest text-purple-600 px-1">TEMAS</div>
-            {data.categories.map((cat) => {
-              const catModules = data.modules.filter((m) => m.category_id === cat.id);
-              return (
-                <div key={cat.id} className="relative">
-                  <div className="rounded-lg border-2 border-purple-300 bg-purple-50 p-3 text-sm">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Folder className="h-4 w-4 text-purple-600 shrink-0" />
-                      <span className="font-semibold text-purple-900 line-clamp-2">{cat.title}</span>
-                    </div>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${TIER_COLOR[cat.access_tier]}`}>{cat.access_tier}</span>
-                    <div className="mt-1 text-[11px] text-purple-700">{catModules.length} módulos</div>
-                  </div>
-                  {/* connector line */}
-                  <div className="absolute top-1/2 -right-6 w-6 border-t-2 border-dashed border-purple-300" />
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="w-6" /> {/* spacer */}
-
-          {/* MÓDULOS column */}
-          <div className="flex flex-col gap-2 w-56">
-            <div className="text-xs font-bold uppercase tracking-widest text-blue-600 px-1">MÓDULOS</div>
-            {data.modules.map((mod) => {
-              const modLessons = data.lessons.filter((l) => l.module_id === mod.id);
-              return (
-                <div key={mod.id} className="relative">
-                  <div className="rounded-lg border-2 border-blue-300 bg-blue-50 p-3 text-sm">
-                    <div className="flex items-center gap-2 mb-1">
-                      <BookOpen className="h-4 w-4 text-blue-600 shrink-0" />
-                      <span className="font-medium text-blue-900 line-clamp-2">{mod.title}</span>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${TIER_COLOR[mod.access_tier]}`}>{mod.access_tier}</span>
-                      {mod.unlock_delay_days > 0 && <span className="text-[10px] text-orange-600">+{mod.unlock_delay_days}d</span>}
-                    </div>
-                    <div className="mt-1 text-[11px] text-blue-700">{modLessons.length} aulas</div>
-                  </div>
-                  <div className="absolute top-1/2 -right-6 w-6 border-t-2 border-dashed border-blue-300" />
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="w-6" /> {/* spacer */}
-
-          {/* AULAS column */}
-          <div className="flex flex-col gap-1.5 w-56">
-            <div className="text-xs font-bold uppercase tracking-widest text-green-600 px-1">AULAS</div>
-            {data.lessons.map((l) => (
-              <div key={l.id} className={`rounded-lg border-2 p-2 text-xs ${l.published ? "border-green-300 bg-green-50" : "border-gray-200 bg-gray-50"}`}>
-                <div className="flex items-center gap-1.5">
-                  <PlayCircle className={`h-3 w-3 shrink-0 ${l.published ? "text-green-600" : "text-gray-400"}`} />
-                  <span className={`line-clamp-1 ${l.published ? "text-green-900" : "text-gray-500"}`}>{l.title}</span>
-                </div>
-                <div className="flex gap-1.5 mt-1">
-                  <span className={`text-[9px] px-1 py-0.5 rounded ${TIER_COLOR[l.access_tier]}`}>{l.access_tier}</span>
-                  {!l.published && <span className="text-[9px] text-gray-400">rascunho</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+    <Suspense fallback={<div className="text-muted-foreground">Carregando visualização...</div>}>
+      <FlowBuilder
+        cats={cats}
+        mods={mods}
+        lsns={lsns}
+        form={form}
+        saving={saving}
+        onOpenCreate={openCreate}
+        onOpenEdit={openEdit}
+        onCloseForm={() => setForm(null)}
+        onSave={handleSave}
+        onDelete={handleDelete}
+      />
+    </Suspense>
   );
 }
