@@ -20,7 +20,7 @@ function Favoritos() {
         .from("lesson_favorites")
         .select("lesson_id, lessons(*)")
         .eq("user_id", user!.id);
-      return (data ?? []) as Array<{ lesson_id: string; lessons: { id: string; title: string; cover_url: string | null; module_id: string; access_tier: string } }>;
+      return (data ?? []) as unknown as Array<{ lesson_id: string; lessons: { id: string; title: string; cover_url: string | null; module_id: string; access_tier: string } | null }>;
     },
   });
 
