@@ -19,6 +19,8 @@ import { Route as AppFavoritosRouteImport } from './routes/_app/favoritos'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppModulosIdRouteImport } from './routes/_app/modulos.$id'
+import { Route as ApiPublicCacktoWebhookRouteImport } from './routes/api/public/cackto/webhook'
+import { Route as ApiPublicCacktoDiagRouteImport } from './routes/api/public/cackto/diag'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -69,6 +71,16 @@ const AppModulosIdRoute = AppModulosIdRouteImport.update({
   path: '/modulos/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiPublicCacktoWebhookRoute = ApiPublicCacktoWebhookRouteImport.update({
+  id: '/api/public/cackto/webhook',
+  path: '/api/public/cackto/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCacktoDiagRoute = ApiPublicCacktoDiagRouteImport.update({
+  id: '/api/public/cackto/diag',
+  path: '/api/public/cackto/diag',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -80,6 +92,8 @@ export interface FileRoutesByFullPath {
   '/suporte': typeof AppSuporteRoute
   '/upgrade': typeof AppUpgradeRoute
   '/modulos/$id': typeof AppModulosIdRoute
+  '/api/public/cackto/diag': typeof ApiPublicCacktoDiagRoute
+  '/api/public/cackto/webhook': typeof ApiPublicCacktoWebhookRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -91,6 +105,8 @@ export interface FileRoutesByTo {
   '/upgrade': typeof AppUpgradeRoute
   '/': typeof AppIndexRoute
   '/modulos/$id': typeof AppModulosIdRoute
+  '/api/public/cackto/diag': typeof ApiPublicCacktoDiagRoute
+  '/api/public/cackto/webhook': typeof ApiPublicCacktoWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -104,6 +120,8 @@ export interface FileRoutesById {
   '/_app/upgrade': typeof AppUpgradeRoute
   '/_app/': typeof AppIndexRoute
   '/_app/modulos/$id': typeof AppModulosIdRoute
+  '/api/public/cackto/diag': typeof ApiPublicCacktoDiagRoute
+  '/api/public/cackto/webhook': typeof ApiPublicCacktoWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -117,6 +135,8 @@ export interface FileRouteTypes {
     | '/suporte'
     | '/upgrade'
     | '/modulos/$id'
+    | '/api/public/cackto/diag'
+    | '/api/public/cackto/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -128,6 +148,8 @@ export interface FileRouteTypes {
     | '/upgrade'
     | '/'
     | '/modulos/$id'
+    | '/api/public/cackto/diag'
+    | '/api/public/cackto/webhook'
   id:
     | '__root__'
     | '/_app'
@@ -140,11 +162,15 @@ export interface FileRouteTypes {
     | '/_app/upgrade'
     | '/_app/'
     | '/_app/modulos/$id'
+    | '/api/public/cackto/diag'
+    | '/api/public/cackto/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicCacktoDiagRoute: typeof ApiPublicCacktoDiagRoute
+  ApiPublicCacktoWebhookRoute: typeof ApiPublicCacktoWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -219,6 +245,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppModulosIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/public/cackto/webhook': {
+      id: '/api/public/cackto/webhook'
+      path: '/api/public/cackto/webhook'
+      fullPath: '/api/public/cackto/webhook'
+      preLoaderRoute: typeof ApiPublicCacktoWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cackto/diag': {
+      id: '/api/public/cackto/diag'
+      path: '/api/public/cackto/diag'
+      fullPath: '/api/public/cackto/diag'
+      preLoaderRoute: typeof ApiPublicCacktoDiagRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -249,17 +289,9 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicCacktoDiagRoute: ApiPublicCacktoDiagRoute,
+  ApiPublicCacktoWebhookRoute: ApiPublicCacktoWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
