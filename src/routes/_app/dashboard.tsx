@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useCurrentUser, tierAllows, isModuleUnlocked } from "@/hooks/use-auth";
 import useEmblaCarousel from "embla-carousel-react";
-import { Lock, ChevronLeft, ChevronRight, PlayCircle, Clock } from "lucide-react";
+import { Lock, ChevronLeft, ChevronRight, PlayCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Category, Module } from "@/lib/database.types";
@@ -105,46 +105,52 @@ function CategorySection({ category, modules }: { category: Category; modules: M
 }
 
 function ModuleCard({ module: m, fallbackCover, lessonCount, locked, lockReason }: { module: Module; fallbackCover?: string | null; lessonCount: number; locked: boolean; lockReason: "tier" | "delay" }) {
-  const target = locked && lockReason === "tier" ? "/upgrade" : `/modulos/${m.id}`;
-  return (
-    <Link
-      to={locked && lockReason === "tier" ? "/upgrade" : "/modulos/$id"}
-      params={locked && lockReason === "tier" ? undefined : { id: m.id }}
-      className="group relative min-w-[260px] max-w-[260px] shrink-0"
-    >
-      <div className="glass-card overflow-hidden rounded-2xl transition hover:shadow-glow">
-        <div className="relative aspect-video w-full overflow-hidden bg-muted">
-          {(m.cover_url || fallbackCover) ? (
-            <img src={m.cover_url ?? fallbackCover!} alt={m.title} className="h-full w-full object-cover transition group-hover:scale-105" />
-          ) : (
-            <div className="grid h-full w-full place-items-center gradient-primary text-primary-foreground">
-              <PlayCircle className="h-10 w-10 opacity-80" />
-            </div>
-          )}
-          {locked && (
-            <div className="absolute inset-0 grid place-items-center bg-background/70 backdrop-blur-sm">
-              <div className="flex flex-col items-center gap-1 text-center">
-                <Lock className="h-6 w-6 text-primary" />
-                <span className="text-xs font-medium">
-                  {lockReason === "tier" ? "Faça upgrade" : "Em breve"}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="space-y-2 p-4">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="line-clamp-1 font-semibold">{m.title}</h3>
-            <Badge variant="secondary" className="shrink-0 text-[10px] uppercase">{m.access_tier}</Badge>
+  const cover = m.cover_url ?? fallbackCover ?? null;
+  const card = (
+    <div className="group relative w-[170px] shrink-0 overflow-hidden rounded-2xl border border-border/60 bg-gradient-card transition-all hover:-translate-y-1 hover:shadow-glow sm:w-[210px]">
+      <div className="relative aspect-[9/16] w-full overflow-hidden bg-gradient-to-br from-primary to-accent">
+        {cover ? (
+          <img src={cover} alt={m.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <PlayCircle className="h-14 w-14 text-primary-foreground/80" />
           </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><PlayCircle className="h-3 w-3" /> {lessonCount} aulas</span>
-            {m.unlock_delay_days > 0 && (
-              <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {m.unlock_delay_days}d</span>
-            )}
+        )}
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/30 to-transparent" />
+
+        {/* Tier badge */}
+        {m.access_tier !== "free" && (
+          <Badge className={`absolute left-3 top-3 ${m.access_tier === "premium" ? "gradient-primary text-primary-foreground" : "bg-secondary"}`}>
+            {m.access_tier === "premium" ? "✨ Premium" : "Básico"}
+          </Badge>
+        )}
+
+        {/* Lock overlay */}
+        {locked && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/70 backdrop-blur-sm px-3 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full gradient-primary shadow-glow">
+              <Lock className="h-6 w-6 text-primary-foreground" />
+            </div>
+            <p className="mt-2 text-xs font-semibold leading-tight">
+              {lockReason === "tier" ? "Faça upgrade" : "Em breve"}
+            </p>
           </div>
+        )}
+
+        {/* Title inside card */}
+        <div className="absolute inset-x-0 bottom-0 p-4">
+          <h3 className="line-clamp-2 text-base font-bold leading-tight">{m.title}</h3>
+          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+            <PlayCircle className="h-3 w-3" /> {lessonCount} aulas
+          </p>
         </div>
       </div>
-    </Link>
+    </div>
   );
+
+  if (locked && lockReason === "tier") return <Link to="/upgrade" className="block">{card}</Link>;
+  if (locked) return card;
+  return <Link to="/modulos/$id" params={{ id: m.id }} search={{ aula: undefined }} className="block">{card}</Link>;
 }
