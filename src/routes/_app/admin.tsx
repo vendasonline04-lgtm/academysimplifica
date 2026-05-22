@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ChevronUp, ChevronDown, Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil } from "lucide-react";
+import { ChevronUp, ChevronDown, Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import type { AccessTier, AppRole, Category, Module, Lesson, UserSubscription, Profile } from "@/lib/database.types";
 
@@ -37,10 +37,12 @@ function AdminPage() {
         <TabsList>
           <TabsTrigger value="content">Conteúdo</TabsTrigger>
           <TabsTrigger value="subs">Assinaturas</TabsTrigger>
+          <TabsTrigger value="clientes">Clientes</TabsTrigger>
           <TabsTrigger value="view">Visualização</TabsTrigger>
         </TabsList>
         <TabsContent value="content" className="mt-6"><ContentManager /></TabsContent>
         <TabsContent value="subs" className="mt-6"><SubscriptionsManager /></TabsContent>
+        <TabsContent value="clientes" className="mt-6"><ClientesManager /></TabsContent>
         <TabsContent value="view" className="mt-6"><StructureView /></TabsContent>
       </Tabs>
     </div>
@@ -551,6 +553,142 @@ function SubscriptionsManager() {
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/* ------------------- Clientes (CRM) ------------------- */
+
+type CacktoOrder = {
+  id: string; external_id: string | null; event: string; status: string;
+  email: string | null; name: string | null; phone: string | null; cpf: string | null;
+  offer_name: string | null; amount: number | null; created_at: string;
+};
+
+const STATUS_STYLE: Record<string, string> = {
+  paid: "bg-green-100 text-green-800",
+  refunded: "bg-red-100 text-red-800",
+  canceled: "bg-gray-100 text-gray-700",
+  pending: "bg-yellow-100 text-yellow-800",
+  unknown: "bg-gray-100 text-gray-500",
+};
+const STATUS_LABEL: Record<string, string> = {
+  paid: "Pago", refunded: "Reembolso", canceled: "Cancelado", pending: "Pendente", unknown: "Desconhecido",
+};
+
+function ClientesManager() {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const { data: orders } = useQuery({
+    queryKey: ["crm-orders"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("cackto_orders" as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+      return (data ?? []) as CacktoOrder[];
+    },
+  });
+
+  const filtered = (orders ?? []).filter((o) => {
+    const matchStatus = statusFilter === "all" || o.status === statusFilter;
+    const q = search.toLowerCase();
+    const matchSearch = !q || [o.email, o.name, o.phone, o.cpf, o.offer_name].some((v) => v?.toLowerCase().includes(q));
+    return matchStatus && matchSearch;
+  });
+
+  const totalPaid = (orders ?? []).filter((o) => o.status === "paid").reduce((s, o) => s + (o.amount ?? 0), 0);
+  const countPaid = (orders ?? []).filter((o) => o.status === "paid").length;
+
+  return (
+    <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="glass-card rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold text-primary">{orders?.length ?? 0}</div>
+          <div className="text-xs text-muted-foreground mt-1">Total eventos</div>
+        </div>
+        <div className="glass-card rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold text-green-600">{countPaid}</div>
+          <div className="text-xs text-muted-foreground mt-1">Compras aprovadas</div>
+        </div>
+        <div className="glass-card rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold text-primary">
+            {(totalPaid / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">Receita total</div>
+        </div>
+        <div className="glass-card rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold">{new Set((orders ?? []).filter((o) => o.status === "paid").map((o) => o.email)).size}</div>
+          <div className="text-xs text-muted-foreground mt-1">Clientes únicos</div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-3 flex-wrap">
+        <Input placeholder="Buscar por nome, email, CPF..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="paid">Pagos</SelectItem>
+            <SelectItem value="pending">Pendentes</SelectItem>
+            <SelectItem value="canceled">Cancelados</SelectItem>
+            <SelectItem value="refunded">Reembolsados</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Table */}
+      <div className="glass-card overflow-hidden rounded-2xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b bg-muted/40 text-left">
+              <tr>
+                <th className="p-3 font-medium">Cliente</th>
+                <th className="p-3 font-medium">Contato</th>
+                <th className="p-3 font-medium">Oferta</th>
+                <th className="p-3 font-medium">Valor</th>
+                <th className="p-3 font-medium">Status</th>
+                <th className="p-3 font-medium">Data</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Nenhum cliente encontrado</td></tr>
+              )}
+              {filtered.map((o) => (
+                <tr key={o.id} className="border-b hover:bg-muted/20 transition-colors">
+                  <td className="p-3">
+                    <div className="font-medium">{o.name ?? "—"}</div>
+                    {o.cpf && <div className="text-xs text-muted-foreground">CPF: {o.cpf}</div>}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-1 text-xs"><Mail className="h-3 w-3" />{o.email ?? "—"}</div>
+                    {o.phone && <div className="flex items-center gap-1 text-xs mt-0.5"><Phone className="h-3 w-3" />{o.phone}</div>}
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground">{o.offer_name ?? o.event}</td>
+                  <td className="p-3 font-medium">
+                    {o.amount != null ? (o.amount / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}
+                  </td>
+                  <td className="p-3">
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_STYLE[o.status] ?? STATUS_STYLE.unknown}`}>
+                      {STATUS_LABEL[o.status] ?? o.status}
+                    </span>
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1"><Calendar className="h-3 w-3" />
+                      {new Date(o.created_at).toLocaleDateString("pt-BR")}
+                    </div>
+                    <div className="text-[10px]">{new Date(o.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
