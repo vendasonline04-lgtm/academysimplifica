@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppUpgradeRouteImport } from './routes/_app/upgrade'
 import { Route as AppSuporteRouteImport } from './routes/_app/suporte'
 import { Route as AppHistoricoRouteImport } from './routes/_app/historico'
 import { Route as AppFavoritosRouteImport } from './routes/_app/favoritos'
@@ -31,6 +32,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppUpgradeRoute = AppUpgradeRouteImport.update({
+  id: '/upgrade',
+  path: '/upgrade',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppSuporteRoute = AppSuporteRouteImport.update({
   id: '/suporte',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/favoritos': typeof AppFavoritosRoute
   '/historico': typeof AppHistoricoRoute
   '/suporte': typeof AppSuporteRoute
+  '/upgrade': typeof AppUpgradeRoute
   '/modulos/$id': typeof AppModulosIdRoute
 }
 export interface FileRoutesByTo {
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/favoritos': typeof AppFavoritosRoute
   '/historico': typeof AppHistoricoRoute
   '/suporte': typeof AppSuporteRoute
+  '/upgrade': typeof AppUpgradeRoute
   '/modulos/$id': typeof AppModulosIdRoute
 }
 export interface FileRoutesById {
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/_app/favoritos': typeof AppFavoritosRoute
   '/_app/historico': typeof AppHistoricoRoute
   '/_app/suporte': typeof AppSuporteRoute
+  '/_app/upgrade': typeof AppUpgradeRoute
   '/_app/modulos/$id': typeof AppModulosIdRoute
 }
 export interface FileRouteTypes {
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/favoritos'
     | '/historico'
     | '/suporte'
+    | '/upgrade'
     | '/modulos/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/favoritos'
     | '/historico'
     | '/suporte'
+    | '/upgrade'
     | '/modulos/$id'
   id:
     | '__root__'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '/_app/favoritos'
     | '/_app/historico'
     | '/_app/suporte'
+    | '/_app/upgrade'
     | '/_app/modulos/$id'
   fileRoutesById: FileRoutesById
 }
@@ -146,6 +158,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/upgrade': {
+      id: '/_app/upgrade'
+      path: '/upgrade'
+      fullPath: '/upgrade'
+      preLoaderRoute: typeof AppUpgradeRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/suporte': {
       id: '/_app/suporte'
@@ -190,6 +209,7 @@ interface AppRouteChildren {
   AppFavoritosRoute: typeof AppFavoritosRoute
   AppHistoricoRoute: typeof AppHistoricoRoute
   AppSuporteRoute: typeof AppSuporteRoute
+  AppUpgradeRoute: typeof AppUpgradeRoute
   AppModulosIdRoute: typeof AppModulosIdRoute
 }
 
@@ -198,6 +218,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFavoritosRoute: AppFavoritosRoute,
   AppHistoricoRoute: AppHistoricoRoute,
   AppSuporteRoute: AppSuporteRoute,
+  AppUpgradeRoute: AppUpgradeRoute,
   AppModulosIdRoute: AppModulosIdRoute,
 }
 
