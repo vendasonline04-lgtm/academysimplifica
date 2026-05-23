@@ -579,13 +579,92 @@ function CategoryEditor({ category, onDone }: { category: Category; onDone: () =
 
 type EditingProduct = { id: string | null; name: string; price: number; category_ids: string[] };
 
+function SetupModal({ onClose }: { onClose: () => void }) {
+  const [pat, setPat] = useState("");
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const run = async () => {
+    if (!pat.trim()) return;
+    setRunning(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+      const res = await fetch("/api/admin/run-migration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ pat: pat.trim() }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.detail ?? body.error ?? "Erro desconhecido");
+      setDone(true);
+      toast.success("Tabelas criadas com sucesso! Recarregue a página.");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4">
+        <div className="flex items-center gap-2">
+          <Webhook className="h-5 w-5 text-primary" />
+          <h3 className="text-lg font-semibold">Configurar banco de dados</h3>
+        </div>
+
+        {done ? (
+          <div className="text-center space-y-3 py-4">
+            <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
+            <p className="font-medium">Tabelas criadas com sucesso!</p>
+            <Button onClick={() => window.location.reload()} className="gradient-primary text-primary-foreground w-full">
+              Recarregar página
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">Como obter o token:</p>
+              <p>1. Acesse <strong>supabase.com</strong> → seu projeto</p>
+              <p>2. Clique no avatar (canto superior direito) → <strong>Access Tokens</strong></p>
+              <p>3. Gere um token e cole abaixo</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Personal Access Token do Supabase</Label>
+              <Input
+                type="password"
+                value={pat}
+                onChange={(e) => setPat(e.target.value)}
+                placeholder="sbp_..."
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                disabled={!pat.trim() || running}
+                onClick={run}
+                className="gradient-primary text-primary-foreground flex-1"
+              >
+                {running ? "Criando tabelas..." : "Criar tabelas agora"}
+              </Button>
+              <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function WebhookManager() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<EditingProduct | null>(null);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
 
-  const { data: products = [], isLoading: loadingProducts } = useQuery({
+  const { data: products = [], isLoading: loadingProducts, error: productsError } = useQuery({
     queryKey: ["webhook-products"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -595,6 +674,7 @@ function WebhookManager() {
       if (error) throw error;
       return (data ?? []) as WebhookProduct[];
     },
+    retry: false,
   });
 
   const { data: categories = [] } = useQuery({
@@ -666,8 +746,28 @@ function WebhookManager() {
     setEditing({ ...editing, category_ids: ids });
   };
 
+  const tablesMissing = (productsError as any)?.message?.includes("schema cache") ||
+    (productsError as any)?.message?.includes("does not exist") ||
+    (productsError as any)?.code === "PGRST200";
+
   return (
     <div className="space-y-6 max-w-2xl">
+      {showSetup && <SetupModal onClose={() => setShowSetup(false)} />}
+
+      {/* Banner de setup quando tabela não existe */}
+      {tablesMissing && (
+        <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 flex items-start gap-3">
+          <div className="text-yellow-500 text-xl">⚠️</div>
+          <div className="flex-1 space-y-2">
+            <p className="text-sm font-medium text-yellow-800">Banco de dados não configurado</p>
+            <p className="text-xs text-yellow-700">As tabelas necessárias ainda não foram criadas no Supabase.</p>
+            <Button size="sm" onClick={() => setShowSetup(true)} className="gradient-primary text-primary-foreground">
+              Configurar agora
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Platform + URL */}
       <div className="glass-card rounded-2xl p-6 space-y-5">
         <div className="flex items-center gap-2">

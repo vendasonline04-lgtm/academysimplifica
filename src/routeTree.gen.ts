@@ -21,6 +21,7 @@ import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppModulosIdRouteImport } from './routes/_app/modulos.$id'
 import { Route as ApiPublicCacktoWebhookRouteImport } from './routes/api/public/cackto/webhook'
 import { Route as ApiPublicCacktoDiagRouteImport } from './routes/api/public/cackto/diag'
+import { Route as ApiAdminRunMigrationRouteImport } from './routes/api/admin/run-migration'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -81,6 +82,11 @@ const ApiPublicCacktoDiagRoute = ApiPublicCacktoDiagRouteImport.update({
   path: '/api/public/cackto/diag',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminRunMigrationRoute = ApiAdminRunMigrationRouteImport.update({
+  id: '/api/admin/run-migration',
+  path: '/api/admin/run-migration',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/modulos/$id': typeof AppModulosIdRoute
   '/api/public/cackto/diag': typeof ApiPublicCacktoDiagRoute
   '/api/public/cackto/webhook': typeof ApiPublicCacktoWebhookRoute
+  '/api/admin/run-migration': typeof ApiAdminRunMigrationRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/modulos/$id': typeof AppModulosIdRoute
   '/api/public/cackto/diag': typeof ApiPublicCacktoDiagRoute
   '/api/public/cackto/webhook': typeof ApiPublicCacktoWebhookRoute
+  '/api/admin/run-migration': typeof ApiAdminRunMigrationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/_app/modulos/$id': typeof AppModulosIdRoute
   '/api/public/cackto/diag': typeof ApiPublicCacktoDiagRoute
   '/api/public/cackto/webhook': typeof ApiPublicCacktoWebhookRoute
+  '/api/admin/run-migration': typeof ApiAdminRunMigrationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/modulos/$id'
     | '/api/public/cackto/diag'
     | '/api/public/cackto/webhook'
+    | '/api/admin/run-migration'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/modulos/$id'
     | '/api/public/cackto/diag'
     | '/api/public/cackto/webhook'
+    | '/api/admin/run-migration'
   id:
     | '__root__'
     | '/_app'
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/_app/modulos/$id'
     | '/api/public/cackto/diag'
     | '/api/public/cackto/webhook'
+    | '/api/admin/run-migration'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -171,6 +183,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ApiPublicCacktoDiagRoute: typeof ApiPublicCacktoDiagRoute
   ApiPublicCacktoWebhookRoute: typeof ApiPublicCacktoWebhookRoute
+  ApiAdminRunMigrationRoute: typeof ApiAdminRunMigrationRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -259,6 +272,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCacktoDiagRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/run-migration': {
+      id: '/api/admin/run-migration'
+      path: '/api/admin/run-migration'
+      fullPath: '/api/admin/run-migration'
+      preLoaderRoute: typeof ApiAdminRunMigrationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -291,6 +311,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ApiPublicCacktoDiagRoute: ApiPublicCacktoDiagRoute,
   ApiPublicCacktoWebhookRoute: ApiPublicCacktoWebhookRoute,
+  ApiAdminRunMigrationRoute: ApiAdminRunMigrationRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
