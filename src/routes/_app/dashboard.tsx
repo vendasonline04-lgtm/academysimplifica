@@ -63,6 +63,8 @@ function CategorySection({ category, modules }: { category: Category; modules: M
 
   if (modules.length === 0) return null;
 
+  const hasCategoryGrant = (userData?.grantedCategoryIds ?? []).includes(category.id);
+
   return (
     <section>
       <div className="mb-4 flex items-center justify-between">
@@ -83,7 +85,7 @@ function CategorySection({ category, modules }: { category: Category; modules: M
         <div className="flex gap-4">
           {modules.map((m) => {
             const tier = userData?.tier ?? "free";
-            const tierOk = tierAllows(tier, m.access_tier);
+            const tierOk = hasCategoryGrant || tierAllows(tier, m.access_tier);
             const unlocked = isModuleUnlocked(userData?.subscription?.created_at, m.unlock_delay_days);
             const locked = !tierOk || !unlocked;
             const lessonCount = m.lessons?.[0]?.count ?? 0;

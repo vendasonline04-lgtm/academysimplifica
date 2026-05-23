@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Heart, History, LifeBuoy, Crown, ShieldCheck, GraduationCap, UserRound } from "lucide-react";
+import { LayoutDashboard, Heart, History, LifeBuoy, Crown, ShieldCheck, GraduationCap, UserRound, Webhook } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -79,6 +79,14 @@ export function AppSidebar() {
                       <Link to="/admin">
                         <ShieldCheck />
                         <span>Admin</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={path === "/admin" && typeof window !== "undefined" && window.location.search.includes("tab=webhook")}>
+                      <Link to="/admin" search={{ tab: "webhook" }}>
+                        <Webhook />
+                        <span>Webhook</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

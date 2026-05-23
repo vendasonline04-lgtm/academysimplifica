@@ -1,4 +1,6 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useSearch } from "@tanstack/react-router";
+import { z } from "zod";
+import { zodValidator } from "@tanstack/zod-adapter";
 import { useQuery, useQueryClient, useQueryClient as useQC } from "@tanstack/react-query";
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import type { FormState, CreatedPayload } from "@/components/flow/types";
@@ -14,11 +16,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Calendar, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Calendar, GripVertical, ChevronUp, ChevronDown, Webhook, Copy, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import type { AccessTier, AppRole, Category, Module, Lesson, UserSubscription, Profile } from "@/lib/database.types";
+import type { AccessTier, AppRole, Category, Module, Lesson, UserSubscription, Profile, WebhookProduct } from "@/lib/database.types";
+
+const adminSearchSchema = z.object({
+  tab: z.enum(["content", "subs", "clientes", "webhook", "view"]).optional(),
+});
 
 export const Route = createFileRoute("/_app/admin")({
+  validateSearch: zodValidator(adminSearchSchema),
   beforeLoad: async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw redirect({ to: "/auth" });
@@ -30,19 +37,22 @@ export const Route = createFileRoute("/_app/admin")({
 });
 
 function AdminPage() {
+  const { tab } = useSearch({ from: "/_app/admin" });
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Painel Admin</h1>
-      <Tabs defaultValue="content">
+      <Tabs defaultValue={tab ?? "content"}>
         <TabsList>
           <TabsTrigger value="content">Conteúdo</TabsTrigger>
           <TabsTrigger value="subs">Assinaturas</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
+          <TabsTrigger value="webhook">Webhook</TabsTrigger>
           <TabsTrigger value="view">Visualização</TabsTrigger>
         </TabsList>
         <TabsContent value="content" className="mt-6"><ContentManager /></TabsContent>
         <TabsContent value="subs" className="mt-6"><SubscriptionsManager /></TabsContent>
         <TabsContent value="clientes" className="mt-6"><ClientesManager /></TabsContent>
+        <TabsContent value="webhook" className="mt-6"><WebhookManager /></TabsContent>
         <TabsContent value="view" className="mt-6"><StructureView /></TabsContent>
       </Tabs>
     </div>
@@ -561,6 +571,272 @@ function CategoryEditor({ category, onDone }: { category: Category; onDone: () =
         <Button onClick={save} className="gradient-primary text-primary-foreground">Salvar</Button>
         <Button variant="ghost" onClick={onDone}>Cancelar</Button>
       </div>
+    </div>
+  );
+}
+
+/* ------------------- Webhook Manager ------------------- */
+
+type EditingProduct = { id: string | null; name: string; price: number; category_ids: string[] };
+
+function WebhookManager() {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState<EditingProduct | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const { data: products = [], isLoading: loadingProducts } = useQuery({
+    queryKey: ["webhook-products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("webhook_products" as any)
+        .select("*")
+        .order("created_at");
+      if (error) throw error;
+      return (data ?? []) as WebhookProduct[];
+    },
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["webhook-categories"],
+    queryFn: async () => {
+      const { data } = await supabase.from("categories").select("*").order("sort_order");
+      return (data ?? []) as Category[];
+    },
+  });
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["webhook-products"] });
+
+  const webhookUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/api/public/cackto/webhook`
+    : "/api/public/cackto/webhook";
+
+  const copyUrl = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    toast.success("URL copiada!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const startNew = () =>
+    setEditing({ id: null, name: "", price: 0, category_ids: [] });
+
+  const startEdit = (p: WebhookProduct) =>
+    setEditing({ id: p.id, name: p.name, price: p.price, category_ids: p.category_ids });
+
+  const saveProduct = async () => {
+    if (!editing || !editing.name.trim()) return;
+    setSaving(true);
+    try {
+      if (editing.id) {
+        const { error } = await supabase
+          .from("webhook_products" as any)
+          .update({ name: editing.name, price: editing.price, category_ids: editing.category_ids })
+          .eq("id", editing.id);
+        if (error) throw error;
+        toast.success("Produto atualizado!");
+      } else {
+        const { error } = await supabase
+          .from("webhook_products" as any)
+          .insert({ name: editing.name, price: editing.price, category_ids: editing.category_ids });
+        if (error) throw error;
+        toast.success("Produto criado!");
+      }
+      setEditing(null);
+      invalidate();
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteProduct = async (id: string) => {
+    const { error } = await supabase.from("webhook_products" as any).delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Produto removido!");
+    invalidate();
+  };
+
+  const toggleCategory = (catId: string) => {
+    if (!editing) return;
+    const ids = editing.category_ids.includes(catId)
+      ? editing.category_ids.filter((id) => id !== catId)
+      : [...editing.category_ids, catId];
+    setEditing({ ...editing, category_ids: ids });
+  };
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      {/* Platform + URL */}
+      <div className="glass-card rounded-2xl p-6 space-y-5">
+        <div className="flex items-center gap-2">
+          <Webhook className="h-5 w-5 text-primary" />
+          <h2 className="text-base font-semibold">Configuração do Webhook</h2>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Plataforma de pagamento</Label>
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg border bg-muted/40 px-4 py-2 text-sm font-medium">Cackto</div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-[11px] font-medium text-green-800">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500" /> Ativa
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>URL do Webhook</Label>
+          <p className="text-xs text-muted-foreground">Cole esta URL no painel da Cackto em Configurações → Webhook</p>
+          <div className="flex gap-2">
+            <Input readOnly value={webhookUrl} className="font-mono text-xs bg-muted/30 flex-1" />
+            <Button variant="outline" size="sm" onClick={copyUrl} className="shrink-0 gap-1.5">
+              {copied ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Copiado" : "Copiar"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Products */}
+      <div className="glass-card rounded-2xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Produtos / Ofertas</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Defina quais cursos cada produto libera ao comprador.</p>
+          </div>
+          <Button size="sm" onClick={startNew} className="gradient-primary text-primary-foreground">
+            <Plus className="mr-1 h-4 w-4" /> Novo Produto
+          </Button>
+        </div>
+
+        {loadingProducts && <div className="text-sm text-muted-foreground">Carregando...</div>}
+
+        {!loadingProducts && products.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed py-10 text-sm text-muted-foreground">
+            <DollarSign className="h-8 w-8 opacity-30" />
+            <span>Nenhum produto cadastrado</span>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {products.map((p) => (
+            <div key={p.id} className="rounded-xl border bg-background/60 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="space-y-1">
+                  <p className="font-medium text-sm">{p.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(p.price / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(p)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteProduct(p.id)}>
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+              {p.category_ids.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {p.category_ids.map((cid) => {
+                    const cat = categories.find((c) => c.id === cid);
+                    return cat ? (
+                      <Badge key={cid} variant="secondary" className="text-xs">{cat.title}</Badge>
+                    ) : null;
+                  })}
+                </div>
+              ) : (
+                <p className="mt-2 text-[11px] text-muted-foreground italic">Nenhum curso associado</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Editor modal */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold">{editing.id ? "Editar Produto" : "Novo Produto"}</h3>
+
+            <div className="space-y-1.5">
+              <Label>Nome do produto / oferta</Label>
+              <Input
+                value={editing.name}
+                onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                placeholder="Ex: Curso Completo — Acesso Vitalício"
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Preço (R$)</Label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="number"
+                  value={editing.price > 0 ? editing.price / 100 : ""}
+                  onChange={(e) => setEditing({ ...editing, price: Math.round(Number(e.target.value) * 100) })}
+                  placeholder="0,00"
+                  className="pl-9"
+                  min={0}
+                  step={0.01}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Cursos liberados com esta compra</Label>
+              <p className="text-xs text-muted-foreground">Clique nos cursos que serão desbloqueados</p>
+              <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                {categories.length === 0 && (
+                  <p className="text-center text-xs text-muted-foreground py-4">Nenhum curso criado ainda</p>
+                )}
+                {categories.map((cat) => {
+                  const selected = editing.category_ids.includes(cat.id);
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => toggleCategory(cat.id)}
+                      className={`w-full flex items-center gap-3 rounded-lg border p-3 text-left text-sm transition-colors ${
+                        selected
+                          ? "border-primary bg-primary/5 text-primary font-medium"
+                          : "hover:border-primary/40 hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className={`h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        selected ? "border-primary bg-primary" : "border-muted-foreground/50"
+                      }`}>
+                        {selected && (
+                          <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 10 8" fill="none">
+                            <path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="flex-1">{cat.title}</span>
+                      {selected && <Badge className="text-[10px] h-5 px-1.5">Selecionado</Badge>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t">
+              <Button
+                disabled={!editing.name.trim() || saving}
+                onClick={saveProduct}
+                className="gradient-primary text-primary-foreground flex-1"
+              >
+                {saving ? "Salvando..." : editing.id ? "Salvar Alterações" : "Criar Produto"}
+              </Button>
+              <Button variant="ghost" onClick={() => setEditing(null)}>Cancelar</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

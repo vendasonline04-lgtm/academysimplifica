@@ -176,11 +176,12 @@ function ModulePage() {
   );
 
   const tier = userData?.tier ?? "free";
-  const moduleLocked = !tierAllows(tier, mod.access_tier);
+  const hasCategoryGrant = (userData?.grantedCategoryIds ?? []).includes(mod.category_id ?? "");
+  const moduleLocked = !hasCategoryGrant && !tierAllows(tier, mod.access_tier);
   const unlocked = isModuleUnlocked(userData?.subscription?.created_at, mod.unlock_delay_days);
   const progressPct = lessons.length ? (lessons.filter((l) => completed.has(l.id)).length / lessons.length) * 100 : 0;
   const activeVideo = getSafeVideo(active?.panda_embed_url);
-  const activeLocked = active ? !tierAllows(tier, active.access_tier) : false;
+  const activeLocked = active ? (!hasCategoryGrant && !tierAllows(tier, active.access_tier)) : false;
   const activeIdx = active ? lessons.findIndex((l) => l.id === active.id) : -1;
 
   if (moduleLocked || !unlocked) return (
@@ -352,7 +353,7 @@ function ModulePage() {
                 <div className="space-y-2">
                   {lessons.map((l, i) => {
                     const isActive = active?.id === l.id;
-                    const lLocked = !tierAllows(tier, l.access_tier);
+                    const lLocked = !hasCategoryGrant && !tierAllows(tier, l.access_tier);
                     const done = completed.has(l.id);
                     return (
                       <button key={l.id} onClick={() => { setActive(l); setSidebarOpen(false); }}

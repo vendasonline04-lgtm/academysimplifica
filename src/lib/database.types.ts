@@ -122,6 +122,24 @@ export interface LessonResource {
   created_at: string;
 }
 
+export interface WebhookProduct {
+  id: string;
+  name: string;
+  price: number;
+  category_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCategoryAccess {
+  id: string;
+  user_id: string;
+  category_id: string;
+  product_id: string | null;
+  external_order_id: string | null;
+  granted_at: string;
+}
+
 type TableDef<T> = {
   Row: T;
   Insert: Partial<T> & Record<string, unknown>;
@@ -144,6 +162,8 @@ export interface Database {
       lesson_comments: TableDef<LessonComment>;
       lesson_admin_notes: TableDef<LessonAdminNote>;
       lesson_resources: TableDef<LessonResource>;
+      webhook_products: TableDef<WebhookProduct>;
+      user_category_access: TableDef<UserCategoryAccess>;
     };
     Views: Record<string, never>;
     Enums: {

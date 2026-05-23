@@ -38,6 +38,42 @@ async function getAuthUserByEmail(email: string) {
   return data.users.find((user) => user.email?.toLowerCase() === email) ?? null;
 }
 
+// Busca o produto pelo nome da oferta (match exato ou parcial)
+async function findProductByOfferName(offerName: string | null): Promise<{ id: string; category_ids: string[] } | null> {
+  if (!offerName) return null;
+  const { data } = await supabaseAdmin
+    .from("webhook_products")
+    .select("id, category_ids")
+    .ilike("name", offerName.trim());
+  if (data && data.length > 0) return data[0] as { id: string; category_ids: string[] };
+  return null;
+}
+
+// Concede acesso às categorias do produto para o usuário
+async function grantCategoryAccess(userId: string, productId: string, categoryIds: string[], orderId: string) {
+  if (!categoryIds.length) return;
+  const rows = categoryIds.map((category_id) => ({
+    user_id: userId,
+    category_id,
+    product_id: productId,
+    external_order_id: orderId,
+  }));
+  const { error } = await supabaseAdmin
+    .from("user_category_access")
+    .upsert(rows, { onConflict: "user_id,category_id" });
+  if (error) console.error("[webhook] user_category_access upsert error", error);
+}
+
+// Revoga acesso às categorias que vieram de um determinado produto
+async function revokeCategoryAccess(userId: string, productId: string) {
+  const { error } = await supabaseAdmin
+    .from("user_category_access")
+    .delete()
+    .eq("user_id", userId)
+    .eq("product_id", productId);
+  if (error) console.error("[webhook] user_category_access delete error", error);
+}
+
 export const Route = createFileRoute("/api/public/cackto/webhook")({
   server: {
     handlers: {
@@ -89,23 +125,30 @@ export const Route = createFileRoute("/api/public/cackto/webhook")({
           const shouldActivate = status === "paid";
           const shouldRevoke = status === "refunded" || status === "canceled";
 
-          if (shouldActivate) {
-            // Determina tier pelo offer_id (configurável via env)
-            const offerMap = parseOfferMap(process.env.CACKTO_OFFER_MAP ?? "");
-            const tier = offerMap[offerId ?? ""] ?? process.env.CACKTO_DEFAULT_TIER ?? "basic";
+          // Busca produto configurado no admin pelo nome da oferta
+          const product = await findProductByOfferName(offerName);
 
+          // Determina tier: pelo produto configurado → pelo mapa de env → default
+          const offerMap = parseOfferMap(process.env.CACKTO_OFFER_MAP ?? "");
+          const tier = offerMap[offerId ?? ""] ?? process.env.CACKTO_DEFAULT_TIER ?? "basic";
+
+          if (shouldActivate) {
             await supabaseAdmin.from("allowed_emails").upsert(
               { email, tier, status: "active", external_order_id: orderId },
               { onConflict: "email" }
             );
 
-            // Se o aluno já existe, atualiza subscription
             const authUser = await getAuthUserByEmail(email);
             if (authUser) {
               await supabaseAdmin.from("user_subscriptions").upsert(
                 { user_id: authUser.id, tier, status: "active", payment_provider: "cackto", external_id: orderId },
                 { onConflict: "user_id" }
               );
+
+              // Concede acesso granular por categoria (via produto configurado no admin)
+              if (product && product.category_ids.length > 0) {
+                await grantCategoryAccess(authUser.id, product.id, product.category_ids, orderId);
+              }
             }
           } else if (shouldRevoke) {
             await supabaseAdmin.from("allowed_emails")
@@ -115,6 +158,11 @@ export const Route = createFileRoute("/api/public/cackto/webhook")({
             if (authUser) {
               await supabaseAdmin.from("user_subscriptions")
                 .update({ status: "canceled" }).eq("user_id", authUser.id);
+
+              // Revoga acesso às categorias do produto
+              if (product) {
+                await revokeCategoryAccess(authUser.id, product.id);
+              }
             }
           }
         }
