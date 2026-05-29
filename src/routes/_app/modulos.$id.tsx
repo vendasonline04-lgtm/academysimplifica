@@ -190,9 +190,9 @@ function ModulePage() {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full gradient-primary shadow-glow">
           <Lock className="h-8 w-8 text-primary-foreground" />
         </div>
-        <h1 className="text-2xl font-bold">{!unlocked ? "Conteúdo em breve" : `Conteúdo ${mod.access_tier === "premium" ? "Premium" : "Básico"}`}</h1>
+        <h1 className="text-2xl font-bold">{!unlocked ? "Conteúdo destrava em breve!" : `Conteúdo ${mod.access_tier === "premium" ? "Premium" : "Básico"}`}</h1>
         <p className="text-muted-foreground text-sm">
-          {!unlocked ? `Este módulo desbloqueia ${mod.unlock_delay_days} dias após o início da sua assinatura.` : "Faça upgrade para acessar este módulo."}
+          {!unlocked ? `Este módulo desbloqueia ${mod.unlock_delay_days} dias após a data da sua compra.` : "Faça upgrade para acessar este módulo."}
         </p>
         {moduleLocked && (
           <Button onClick={() => navigate({ to: "/upgrade" })} className="gradient-primary text-primary-foreground">
