@@ -38,8 +38,21 @@ async function getAuthUserByEmail(email: string) {
   return data.users.find((user) => user.email?.toLowerCase() === email) ?? null;
 }
 
-// Busca o produto pelo nome da oferta (match exato ou parcial)
-async function findProductByOfferName(offerName: string | null): Promise<{ id: string; category_ids: string[] } | null> {
+// Busca produto pelo cackto_secret (prioridade) ou pelo nome da oferta
+async function findProductByOfferName(
+  offerName: string | null,
+  incomingSecret: string
+): Promise<{ id: string; category_ids: string[] } | null> {
+  // 1. Match por cackto_secret (prioridade absoluta)
+  if (incomingSecret) {
+    const { data: bySecret } = await supabaseAdmin
+      .from("webhook_products")
+      .select("id, category_ids")
+      .eq("cackto_secret", incomingSecret)
+      .limit(1);
+    if (bySecret && bySecret.length > 0) return bySecret[0] as { id: string; category_ids: string[] };
+  }
+  // 2. Fallback: match por nome da oferta
   if (!offerName) return null;
   const { data } = await supabaseAdmin
     .from("webhook_products")
@@ -126,7 +139,7 @@ export const Route = createFileRoute("/api/public/cackto/webhook")({
           const shouldRevoke = status === "refunded" || status === "canceled";
 
           // Busca produto configurado no admin pelo nome da oferta
-          const product = await findProductByOfferName(offerName);
+          const product = await findProductByOfferName(offerName, incoming);
 
           // Determina tier: pelo produto configurado → pelo mapa de env → default
           const offerMap = parseOfferMap(process.env.CACKTO_OFFER_MAP ?? "");
