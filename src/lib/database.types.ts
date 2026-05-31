@@ -127,6 +127,7 @@ export interface WebhookProduct {
   name: string;
   price: number;
   category_ids: string[];
+  cackto_secret: string | null;
   created_at: string;
   updated_at: string;
 }
