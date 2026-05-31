@@ -687,9 +687,7 @@ function WebhookManager() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["webhook-products"] });
 
-  const webhookUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/api/public/cackto/webhook`
-    : "/api/public/cackto/webhook";
+  const webhookUrl = "https://lzfqofifjdzcqnglugrc.supabase.co/functions/v1/cackto-webhook";
 
   const copyUrl = () => {
     navigator.clipboard.writeText(webhookUrl);
