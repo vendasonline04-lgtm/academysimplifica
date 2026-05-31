@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useSearch } from "@tanstack/react-router";
+﻿import { createFileRoute, redirect, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { useQuery, useQueryClient, useQueryClient as useQC } from "@tanstack/react-query";
@@ -1016,85 +1016,62 @@ function SubscriptionsManager() {
 
 /* ------------------- Clientes (CRM) ------------------- */
 
-type CacktoOrder = {
-  id: string; external_id: string | null; event: string; status: string;
-  email: string | null; name: string | null; phone: string | null; cpf: string | null;
-  offer_name: string | null; amount: number | null; created_at: string;
-};
-
-const STATUS_STYLE: Record<string, string> = {
-  paid: "bg-green-100 text-green-800",
-  refunded: "bg-red-100 text-red-800",
-  canceled: "bg-gray-100 text-gray-700",
-  pending: "bg-yellow-100 text-yellow-800",
-  unknown: "bg-gray-100 text-gray-500",
-};
-const STATUS_LABEL: Record<string, string> = {
-  paid: "Pago", refunded: "Reembolso", canceled: "Cancelado", pending: "Pendente", unknown: "Desconhecido",
+type AdminCliente = {
+  id: string; external_id: string | null;
+  nome_completo: string | null; cpf: string | null; email: string | null; telefone: string | null;
+  produto: string | null; tipo_oferta: string | null; valor: number | null;
+  status: string; data_compra: string | null; hora_compra: string | null; created_at: string;
 };
 
 function ClientesManager() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
 
-  const { data: orders } = useQuery({
-    queryKey: ["crm-orders"],
+  const { data: clientes } = useQuery({
+    queryKey: ["crm-clientes"],
     queryFn: async () => {
       const { data } = await supabase
-        .from("cackto_orders" as any)
+        .from("admin_clientes" as any)
         .select("*")
         .order("created_at", { ascending: false });
-      return (data ?? []) as CacktoOrder[];
+      return (data ?? []) as AdminCliente[];
     },
   });
 
-  const filtered = (orders ?? []).filter((o) => {
-    const matchStatus = statusFilter === "all" || o.status === statusFilter;
+  const filtered = (clientes ?? []).filter((o) => {
     const q = search.toLowerCase();
-    const matchSearch = !q || [o.email, o.name, o.phone, o.cpf, o.offer_name].some((v) => v?.toLowerCase().includes(q));
-    return matchStatus && matchSearch;
+    return !q || [o.email, o.nome_completo, o.cpf, o.telefone].some((v) => v?.toLowerCase().includes(q));
   });
 
-  const totalPaid = (orders ?? []).filter((o) => o.status === "paid").reduce((s, o) => s + (o.amount ?? 0), 0);
-  const countPaid = (orders ?? []).filter((o) => o.status === "paid").length;
+  const totalReceita = (clientes ?? []).reduce((s, o) => s + (o.valor ?? 0), 0);
+  const uniqueEmails = new Set((clientes ?? []).map((o) => o.email)).size;
 
   return (
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="glass-card rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-primary">{orders?.length ?? 0}</div>
-          <div className="text-xs text-muted-foreground mt-1">Total eventos</div>
+          <div className="text-2xl font-bold text-primary">{clientes?.length ?? 0}</div>
+          <div className="text-xs text-muted-foreground mt-1">Total compras</div>
         </div>
         <div className="glass-card rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{countPaid}</div>
+          <div className="text-2xl font-bold text-green-600">{clientes?.length ?? 0}</div>
           <div className="text-xs text-muted-foreground mt-1">Compras aprovadas</div>
         </div>
         <div className="glass-card rounded-xl p-4 text-center">
           <div className="text-2xl font-bold text-primary">
-            {(totalPaid / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            {totalReceita.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
           </div>
           <div className="text-xs text-muted-foreground mt-1">Receita total</div>
         </div>
         <div className="glass-card rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold">{new Set((orders ?? []).filter((o) => o.status === "paid").map((o) => o.email)).size}</div>
+          <div className="text-2xl font-bold">{uniqueEmails}</div>
           <div className="text-xs text-muted-foreground mt-1">Clientes únicos</div>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Search */}
       <div className="flex gap-3 flex-wrap">
         <Input placeholder="Buscar por nome, email, CPF..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="paid">Pagos</SelectItem>
-            <SelectItem value="pending">Pendentes</SelectItem>
-            <SelectItem value="canceled">Cancelados</SelectItem>
-            <SelectItem value="refunded">Reembolsados</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Table */}
@@ -1103,43 +1080,44 @@ function ClientesManager() {
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40 text-left">
               <tr>
-                <th className="p-3 font-medium">Cliente</th>
-                <th className="p-3 font-medium">Contato</th>
-                <th className="p-3 font-medium">Oferta</th>
+                <th className="p-3 font-medium">Nome Completo</th>
+                <th className="p-3 font-medium">CPF</th>
+                <th className="p-3 font-medium">Email</th>
+                <th className="p-3 font-medium">Telefone</th>
+                <th className="p-3 font-medium">Produto</th>
+                <th className="p-3 font-medium">Tipo</th>
                 <th className="p-3 font-medium">Valor</th>
-                <th className="p-3 font-medium">Status</th>
                 <th className="p-3 font-medium">Data</th>
+                <th className="p-3 font-medium">Hora</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Nenhum cliente encontrado</td></tr>
+                <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">Nenhum cliente encontrado</td></tr>
               )}
               {filtered.map((o) => (
                 <tr key={o.id} className="border-b hover:bg-muted/20 transition-colors">
-                  <td className="p-3">
-                    <div className="font-medium">{o.name ?? "—"}</div>
-                    {o.cpf && <div className="text-xs text-muted-foreground">CPF: {o.cpf}</div>}
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center gap-1 text-xs"><Mail className="h-3 w-3" />{o.email ?? "—"}</div>
-                    {o.phone && <div className="flex items-center gap-1 text-xs mt-0.5"><Phone className="h-3 w-3" />{o.phone}</div>}
-                  </td>
-                  <td className="p-3 text-xs text-muted-foreground">{o.offer_name ?? o.event}</td>
-                  <td className="p-3 font-medium">
-                    {o.amount != null ? (o.amount / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}
-                  </td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_STYLE[o.status] ?? STATUS_STYLE.unknown}`}>
-                      {STATUS_LABEL[o.status] ?? o.status}
-                    </span>
+                  <td className="p-3 font-medium">{o.nome_completo ?? "—"}</td>
+                  <td className="p-3 text-xs text-muted-foreground">{o.cpf ?? "—"}</td>
+                  <td className="p-3 text-xs">
+                    <div className="flex items-center gap-1"><Mail className="h-3 w-3" />{o.email ?? "—"}</div>
                   </td>
                   <td className="p-3 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1"><Calendar className="h-3 w-3" />
-                      {new Date(o.created_at).toLocaleDateString("pt-BR")}
-                    </div>
-                    <div className="text-[10px]">{new Date(o.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</div>
+                    {o.telefone ? <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{o.telefone}</div> : "—"}
                   </td>
+                  <td className="p-3 text-xs text-muted-foreground">{o.produto ?? "—"}</td>
+                  <td className="p-3">
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${o.tipo_oferta === "Premium" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
+                      {o.tipo_oferta ?? "Básico"}
+                    </span>
+                  </td>
+                  <td className="p-3 font-medium">
+                    {o.valor != null ? o.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1"><Calendar className="h-3 w-3" />{o.data_compra ?? "—"}</div>
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground">{o.hora_compra ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
