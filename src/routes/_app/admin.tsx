@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Calendar, GripVertical, ChevronUp, ChevronDown, Webhook, Copy, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Eye, EyeOff, Calendar, GripVertical, ChevronUp, ChevronDown, Webhook, Copy, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import type { AccessTier, AppRole, Category, Module, Lesson, UserSubscription, Profile, WebhookProduct } from "@/lib/database.types";
 
@@ -577,7 +577,7 @@ function CategoryEditor({ category, onDone }: { category: Category; onDone: () =
 
 /* ------------------- Webhook Manager ------------------- */
 
-type EditingProduct = { id: string | null; name: string; price: number; category_ids: string[] };
+type EditingProduct = { id: string | null; name: string; price: number; category_ids: string[]; cackto_secret: string };
 
 function SetupModal({ onClose }: { onClose: () => void }) {
   const [pat, setPat] = useState("");
@@ -662,6 +662,7 @@ function WebhookManager() {
   const [editing, setEditing] = useState<EditingProduct | null>(null);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
 
   const { data: products = [], isLoading: loadingProducts, error: productsError } = useQuery({
@@ -697,10 +698,10 @@ function WebhookManager() {
   };
 
   const startNew = () =>
-    setEditing({ id: null, name: "", price: 0, category_ids: [] });
+    setEditing({ id: null, name: "", price: 0, category_ids: [], cackto_secret: "" });
 
   const startEdit = (p: WebhookProduct) =>
-    setEditing({ id: p.id, name: p.name, price: p.price, category_ids: p.category_ids });
+    setEditing({ id: p.id, name: p.name, price: p.price, category_ids: p.category_ids, cackto_secret: p.cackto_secret ?? "" });
 
   const saveProduct = async () => {
     if (!editing || !editing.name.trim()) return;
@@ -709,14 +710,14 @@ function WebhookManager() {
       if (editing.id) {
         const { error } = await supabase
           .from("webhook_products" as any)
-          .update({ name: editing.name, price: editing.price, category_ids: editing.category_ids })
+          .update({ name: editing.name, price: editing.price, category_ids: editing.category_ids, cackto_secret: editing.cackto_secret || null })
           .eq("id", editing.id);
         if (error) throw error;
         toast.success("Produto atualizado!");
       } else {
         const { error } = await supabase
           .from("webhook_products" as any)
-          .insert({ name: editing.name, price: editing.price, category_ids: editing.category_ids });
+          .insert({ name: editing.name, price: editing.price, category_ids: editing.category_ids, cackto_secret: editing.cackto_secret || null });
         if (error) throw error;
         toast.success("Produto criado!");
       }
@@ -826,6 +827,10 @@ function WebhookManager() {
                   <p className="text-xs text-muted-foreground">
                     {(p.price / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                   </p>
+                  {p.cackto_secret
+                    ? <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">🔑 Secret configurado</span>
+                    : <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">⚠️ Sem secret</span>
+                  }
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(p)}>
@@ -882,6 +887,29 @@ function WebhookManager() {
                   min={0}
                   step={0.01}
                 />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Chave Secreta da Cackto</Label>
+              <p className="text-xs text-muted-foreground">Cole aqui o secret gerado pela Cackto para este produto/oferta</p>
+              <div className="relative flex gap-2">
+                <Input
+                  type={showSecret ? "text" : "password"}
+                  value={editing.cackto_secret}
+                  onChange={(e) => setEditing({ ...editing, cackto_secret: e.target.value })}
+                  placeholder="sk_..."
+                  className="flex-1 font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 h-9 w-9"
+                  onClick={() => setShowSecret(!showSecret)}
+                >
+                  {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
               </div>
             </div>
 
