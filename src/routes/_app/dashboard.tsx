@@ -2,8 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useCurrentUser, tierAllows, isModuleUnlocked } from "@/hooks/use-auth";
+import { useStudentPreview, type PreviewMode } from "@/hooks/use-student-preview";
 import useEmblaCarousel from "embla-carousel-react";
-import { Lock, ChevronLeft, ChevronRight, PlayCircle } from "lucide-react";
+import { Lock, ChevronLeft, ChevronRight, PlayCircle, Eye, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Category, Module } from "@/lib/database.types";
@@ -15,7 +16,32 @@ export const Route = createFileRoute("/_app/dashboard")({
 
 type ModuleWithCount = Module & { lessons: { count: number }[] };
 
+function PreviewBanner() {
+  const { previewMode, setPreviewMode } = useStudentPreview();
+  if (!previewMode) return null;
+
+  const isFull = previewMode === "full";
+  return (
+    <div className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium mb-2 ${isFull ? "bg-primary/10 text-primary border border-primary/20" : "bg-orange-50 text-orange-700 border border-orange-200"}`}>
+      {isFull ? <Eye className="h-4 w-4 shrink-0" /> : <Users className="h-4 w-4 shrink-0" />}
+      <span className="flex-1">
+        {isFull
+          ? "Modo preview: Plataforma Completa — você está vendo todas as aulas desbloqueadas."
+          : "Modo preview: Como Aluno (Básico) — você está vendo como um aluno no plano básico veria a plataforma."}
+      </span>
+      <button
+        onClick={() => setPreviewMode(null)}
+        className="ml-auto rounded-md p-1 hover:bg-black/10 transition-colors"
+        aria-label="Sair do preview"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 function Dashboard() {
+  const { previewMode } = useStudentPreview();
   const { data } = useQuery({
     queryKey: ["dashboard-content"],
     queryFn: async () => {
@@ -42,6 +68,7 @@ function Dashboard() {
 
   return (
     <div className="space-y-12">
+      <PreviewBanner />
       <div>
         <h1 className="text-3xl font-bold">Bem-vindo de volta</h1>
         <p className="mt-1 text-muted-foreground">Continue de onde parou ou explore novos módulos.</p>
@@ -51,13 +78,14 @@ function Dashboard() {
           key={cat.id}
           category={cat}
           modules={data.modules.filter((m) => m.category_id === cat.id)}
+          previewMode={previewMode}
         />
       ))}
     </div>
   );
 }
 
-function CategorySection({ category, modules }: { category: Category; modules: ModuleWithCount[] }) {
+function CategorySection({ category, modules, previewMode }: { category: Category; modules: ModuleWithCount[]; previewMode: PreviewMode }) {
   const { data: userData } = useCurrentUser();
   const [emblaRef, emblaApi] = useEmblaCarousel({ align: "start", dragFree: true });
 
@@ -84,10 +112,20 @@ function CategorySection({ category, modules }: { category: Category; modules: M
       <div className="overflow-hidden" ref={emblaRef}>
         <div className="flex gap-4">
           {modules.map((m) => {
-            const tier = userData?.tier ?? "free";
-            const tierOk = hasCategoryGrant || tierAllows(tier, m.access_tier);
-            const unlocked = isModuleUnlocked(userData?.subscription?.created_at, m.unlock_delay_days);
-            const locked = !tierOk || !unlocked;
+            let locked: boolean;
+            let lockReason: "tier" | "delay" = "tier";
+
+            if (previewMode === "full") {
+              locked = false;
+            } else {
+              const tier = previewMode === "student" ? "basic" : (userData?.tier ?? "free");
+              const tierOk = previewMode === "student" ? tierAllows("basic", m.access_tier) : (hasCategoryGrant || tierAllows(tier, m.access_tier));
+              const subCreatedAt = previewMode === "student" ? null : userData?.subscription?.created_at;
+              const unlocked = isModuleUnlocked(subCreatedAt, m.unlock_delay_days);
+              locked = !tierOk || !unlocked;
+              lockReason = !tierOk ? "tier" : "delay";
+            }
+
             const lessonCount = m.lessons?.[0]?.count ?? 0;
             return (
               <ModuleCard
@@ -96,7 +134,7 @@ function CategorySection({ category, modules }: { category: Category; modules: M
                 fallbackCover={category.cover_url}
                 lessonCount={lessonCount}
                 locked={locked}
-                lockReason={!tierOk ? "tier" : "delay"}
+                lockReason={lockReason}
               />
             );
           })}
