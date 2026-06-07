@@ -122,6 +122,8 @@ export function SurveyForm({
 
       setAnswered(true);
       toast.success("Obrigada pelo seu feedback!");
+      const { default: confetti } = await import("canvas-confetti");
+      confetti({ particleCount: 120, spread: 90, origin: { x: 0.5, y: 0.6 }, colors: ["#a78bfa", "#ec4899", "#22d3ee", "#f59e0b"] });
     } catch (e: any) {
       toast.error(e.message ?? "Erro ao enviar pesquisa");
     } finally {
