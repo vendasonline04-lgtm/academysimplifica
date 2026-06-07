@@ -16,13 +16,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Eye, EyeOff, Calendar, GripVertical, ChevronUp, ChevronDown, Webhook, Copy, CheckCircle2, ClipboardList } from "lucide-react";
+import { Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Eye, EyeOff, Calendar, GripVertical, ChevronUp, ChevronDown, Webhook, Copy, CheckCircle2, ClipboardList, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import type { AccessTier, AppRole, Category, Module, Lesson, UserSubscription, Profile, WebhookProduct } from "@/lib/database.types";
 import { SurveyAdmin } from "@/components/admin/SurveyAdmin";
+import { AnalyticsAdmin } from "@/components/admin/AnalyticsAdmin";
 
 const adminSearchSchema = z.object({
-  tab: z.enum(["content", "subs", "clientes", "webhook", "view", "surveys"]).optional(),
+  tab: z.enum(["content", "subs", "clientes", "webhook", "view", "surveys", "analytics"]).optional(),
 });
 
 export const Route = createFileRoute("/_app/admin")({
@@ -48,6 +49,7 @@ function AdminPage() {
           <TabsTrigger value="subs">Assinaturas</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
           <TabsTrigger value="webhook">Webhook</TabsTrigger>
+          <TabsTrigger value="analytics"><TrendingUp className="mr-1 h-4 w-4" />Análises</TabsTrigger>
           <TabsTrigger value="surveys"><ClipboardList className="mr-1 h-4 w-4" />Pesquisas</TabsTrigger>
           <TabsTrigger value="view">Visualização</TabsTrigger>
         </TabsList>
@@ -55,6 +57,7 @@ function AdminPage() {
         <TabsContent value="subs" className="mt-6"><SubscriptionsManager /></TabsContent>
         <TabsContent value="clientes" className="mt-6"><ClientesManager /></TabsContent>
         <TabsContent value="webhook" className="mt-6"><WebhookManager /></TabsContent>
+        <TabsContent value="analytics" className="mt-6"><AnalyticsAdmin /></TabsContent>
         <TabsContent value="surveys" className="mt-6"><SurveysManager /></TabsContent>
         <TabsContent value="view" className="mt-6"><StructureView /></TabsContent>
       </Tabs>
