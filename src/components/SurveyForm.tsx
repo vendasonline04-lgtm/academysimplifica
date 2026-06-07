@@ -168,10 +168,10 @@ export function SurveyForm({
                     key={opt}
                     type="button"
                     onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: opt }))}
-                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                    className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-150 ${
                       answers[q.id] === opt
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border hover:border-primary/60"
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                        : "border-border hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
                     }`}
                   >
                     {opt}
