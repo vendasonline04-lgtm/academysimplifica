@@ -7,7 +7,7 @@ import { Sparkles, ArrowRight, GraduationCap } from "lucide-react";
 export const Route = createFileRoute("/_app/")({
   head: () => ({
     meta: [
-      { title: "Academy — Sua área de membros em um só lugar" },
+      { title: "Academy Simplifica-AI — A área de membros que te ensina a usar IA" },
       { name: "description", content: "Acesso exclusivo a cursos em vídeo, módulos e aulas em uma plataforma moderna." },
     ],
   }),
@@ -21,16 +21,13 @@ function Index() {
       <div className="bg-blob" style={{ width: 600, height: 600, background: "oklch(0.65 0.22 280)", bottom: -200, right: -200 }} />
       <div className="bg-blob" style={{ width: 400, height: 400, background: "oklch(0.75 0.2 330)", top: "40%", left: "50%" }} />
 
-      <header className="relative z-10 flex items-center justify-between px-6 py-5 md:px-12">
+      <header className="relative z-10 flex items-center px-6 py-5 md:px-12">
         <div className="flex items-center gap-2 font-semibold text-lg">
           <div className="grid h-9 w-9 place-items-center rounded-xl gradient-primary text-primary-foreground shadow-glow">
             <GraduationCap className="h-5 w-5" />
           </div>
-          <span className="font-[Space_Grotesk]">Academy</span>
+          <span className="font-[Space_Grotesk]">Academy Simplifica-AI</span>
         </div>
-        <Button asChild variant="ghost">
-          <Link to="/auth">Entrar</Link>
-        </Button>
       </header>
 
       <main className="relative z-10 mx-auto flex max-w-4xl flex-col items-center px-6 pt-16 pb-24 text-center md:pt-28">
@@ -40,15 +37,15 @@ function Index() {
         </Badge>
 
         <h1 className="text-5xl font-bold tracking-tight md:text-7xl">
-          Sua área de membros
+          A área de membros que te ensina
           <br />
           <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.25_330)] bg-clip-text text-transparent">
-            em um só lugar
+            a trabalhar menos e ganhar mais usando IA
           </span>
         </h1>
 
-        <p className="mt-6 max-w-xl text-lg text-muted-foreground">
-          Cursos em vídeo, módulos organizados e progresso acompanhado. Tudo em uma experiência fluida e bonita.
+        <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
+          Para qualquer pessoa. Do zero ao avançado. Sem código. Sem complicação. Com resultado.
         </p>
 
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">
