@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, X, Save, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Trash2, X, Save, ChevronDown, ChevronRight, Star } from "lucide-react";
 import { toast } from "sonner";
 
 type LessonRef = { id: string; title: string };
@@ -270,6 +270,8 @@ export function SurveyAdmin({
                                 <div className="text-xs text-muted-foreground">
                                   {q.question_type === "text"
                                     ? "Texto livre"
+                                    : q.question_type === "stars"
+                                    ? "⭐ Avaliação em estrelas (1-5)"
                                     : `Múltipla escolha: ${(q.options ?? []).join(", ")}`}
                                 </div>
                               </div>
@@ -296,6 +298,7 @@ export function SurveyAdmin({
                               <SelectContent>
                                 <SelectItem value="text">Texto livre</SelectItem>
                                 <SelectItem value="choice">Múltipla escolha</SelectItem>
+                                <SelectItem value="stars">⭐ Estrelas (1-5)</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -306,6 +309,12 @@ export function SurveyAdmin({
                               value={newQ.options}
                               onChange={(e) => setNewQ((prev) => ({ ...prev, options: e.target.value }))}
                             />
+                          )}
+                          {newQ.type === "stars" && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                              O aluno vai clicar de 1 a 5 estrelas
+                            </p>
                           )}
                           <Button size="sm" onClick={addQuestion} className="h-7 text-xs">
                             <Plus className="mr-1 h-3 w-3" />Adicionar

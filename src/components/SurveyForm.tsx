@@ -4,7 +4,39 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ClipboardList, CheckCircle2 } from "lucide-react";
+import { ClipboardList, CheckCircle2, Star } from "lucide-react";
+
+function StarRating({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [hovered, setHovered] = useState(0);
+  const selected = parseInt(value ?? "0") || 0;
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          onMouseEnter={() => setHovered(n)}
+          onMouseLeave={() => setHovered(0)}
+          onClick={() => onChange(String(n))}
+          className="p-0.5 transition-transform hover:scale-110"
+        >
+          <Star
+            className={`h-8 w-8 transition-colors ${
+              n <= (hovered || selected)
+                ? "fill-yellow-400 text-yellow-400"
+                : "text-muted-foreground"
+            }`}
+          />
+        </button>
+      ))}
+      {selected > 0 && (
+        <span className="ml-2 self-center text-sm text-muted-foreground">
+          {selected} {selected === 1 ? "estrela" : "estrelas"}
+        </span>
+      )}
+    </div>
+  );
+}
 
 type Question = {
   id: string;
@@ -146,28 +178,23 @@ export function SurveyForm({
                   </button>
                 ))}
               </div>
+            ) : q.question_type === "stars" ? (
+              <StarRating
+                value={answers[q.id] ?? ""}
+                onChange={(v) => setAnswers((prev) => ({ ...prev, [q.id]: v }))}
+              />
             ) : null}
           </div>
         ))}
 
         <div>
           <p className="mb-2 text-sm font-semibold">Como você avalia esta aula?</p>
-          <div className="flex flex-wrap gap-2">
-            {RATINGS.map((r) => (
-              <button
-                key={r.value}
-                type="button"
-                onClick={() => setRating(r.value)}
-                className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                  rating === r.value
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border hover:border-primary/60"
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
+          <StarRating value={rating} onChange={setRating} />
+          {rating && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {rating === "1" ? "Ruim" : rating === "2" ? "Regular" : rating === "3" ? "Bom" : rating === "4" ? "Muito bom" : "Excelente"}
+            </p>
+          )}
         </div>
 
         <Button
