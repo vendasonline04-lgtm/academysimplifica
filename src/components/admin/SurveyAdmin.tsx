@@ -36,7 +36,7 @@ export function SurveyAdmin({
   const [answers, setAnswers] = useState<SurveyAnswer[]>([]);
   const [selectedSurvey, setSelectedSurvey] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ title: "", lesson_id: "" });
+  const [createForm, setCreateForm] = useState({ title: "", lesson_id: "none" });
   const [saving, setSaving] = useState(false);
   const [newQ, setNewQ] = useState({ text: "", type: "text", options: "" });
 
@@ -86,13 +86,13 @@ export function SurveyAdmin({
     setSaving(true);
     const { error } = await supabase.from("surveys").insert({
       title: createForm.title,
-      lesson_id: createForm.lesson_id || null,
+      lesson_id: createForm.lesson_id === "none" ? null : createForm.lesson_id,
     });
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Pesquisa criada!");
     setShowCreate(false);
-    setCreateForm({ title: "", lesson_id: "" });
+    setCreateForm({ title: "", lesson_id: "none" });
     await reloadSurveys();
   };
 
@@ -172,7 +172,7 @@ export function SurveyAdmin({
                   <SelectValue placeholder="Selecione uma aula" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma (pesquisa geral)</SelectItem>
+                  <SelectItem value="none">Nenhuma (pesquisa geral)</SelectItem>
                   {lessons.map((l) => (
                     <SelectItem key={l.id} value={l.id}>
                       {l.title}

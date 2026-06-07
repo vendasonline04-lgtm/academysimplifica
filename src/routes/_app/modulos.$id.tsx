@@ -11,13 +11,13 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, PlayCircle, Check, Heart, Lock, Sparkles, Clock, Menu, X } from "lucide-react";
 import { toast } from "sonner";
 import type { Lesson, Module } from "@/lib/database.types";
+import { SurveyForm } from "@/components/SurveyForm";
 
 declare global { interface Window { __pandaEnded?: () => void; } }
 
 const LessonExtras = lazy(() =>
   import("@/components/LessonExtras").then((m) => ({ default: m.LessonExtras }))
 );
-import { SurveyForm } from "@/components/SurveyForm";
 
 const searchSchema = z.object({ aula: z.string().optional() });
 
