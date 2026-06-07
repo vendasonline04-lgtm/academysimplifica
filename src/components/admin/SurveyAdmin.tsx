@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, X, Save, ChevronDown, ChevronRight, Star } from "lucide-react";
+import { Plus, Trash2, X, Save, ChevronDown, ChevronRight, Star, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 type LessonRef = { id: string; title: string };
@@ -39,6 +39,7 @@ export function SurveyAdmin({
   const [createForm, setCreateForm] = useState({ title: "", lesson_id: "none" });
   const [saving, setSaving] = useState(false);
   const [newQ, setNewQ] = useState({ text: "", type: "text", options: "" });
+  const [editingQId, setEditingQId] = useState<string | null>(null);
 
   const reloadSurveys = useCallback(async () => {
     const { data } = await supabase.from("surveys").select("*").order("created_at", { ascending: false });
@@ -111,29 +112,56 @@ export function SurveyAdmin({
     await reloadSurveys();
   };
 
-  const addQuestion = async () => {
+  const saveQuestion = async () => {
     if (!selectedSurvey) return;
     if (!newQ.text.trim()) return toast.error("Escreva o texto da pergunta");
     const opts =
       newQ.type === "choice"
         ? newQ.options.split(",").map((o: string) => o.trim()).filter(Boolean)
         : null;
-    const currentQs = questionsBySurvey[selectedSurvey] ?? [];
-    const { error } = await supabase.from("survey_questions").insert({
-      survey_id: selectedSurvey,
-      question_text: newQ.text,
-      question_type: newQ.type,
-      options: opts,
-      sort_order: currentQs.length,
-    });
-    if (error) return toast.error(error.message);
-    toast.success("Pergunta adicionada!");
+
+    if (editingQId) {
+      const { error } = await supabase.from("survey_questions").update({
+        question_text: newQ.text,
+        question_type: newQ.type,
+        options: opts,
+      }).eq("id", editingQId);
+      if (error) return toast.error(error.message);
+      toast.success("Pergunta atualizada!");
+      setEditingQId(null);
+    } else {
+      const currentQs = questionsBySurvey[selectedSurvey] ?? [];
+      const { error } = await supabase.from("survey_questions").insert({
+        survey_id: selectedSurvey,
+        question_text: newQ.text,
+        question_type: newQ.type,
+        options: opts,
+        sort_order: currentQs.length,
+      });
+      if (error) return toast.error(error.message);
+      toast.success("Pergunta adicionada!");
+    }
     setNewQ({ text: "", type: "text", options: "" });
     await loadSurveyDetail(selectedSurvey);
   };
 
+  const startEditQuestion = (q: SurveyQuestion) => {
+    setEditingQId(q.id);
+    setNewQ({
+      text: q.question_text,
+      type: q.question_type,
+      options: (q.options ?? []).join(", "),
+    });
+  };
+
+  const cancelEditQuestion = () => {
+    setEditingQId(null);
+    setNewQ({ text: "", type: "text", options: "" });
+  };
+
   const deleteQuestion = async (qId: string) => {
     if (!selectedSurvey) return;
+    if (editingQId === qId) cancelEditQuestion();
     await supabase.from("survey_questions").delete().eq("id", qId);
     await loadSurveyDetail(selectedSurvey);
   };
@@ -263,7 +291,7 @@ export function SurveyAdmin({
                             <p className="text-xs text-muted-foreground">Nenhuma pergunta ainda.</p>
                           )}
                           {svQuestions.map((q, i) => (
-                            <div key={q.id} className="flex items-start gap-2 rounded-md bg-muted/40 px-3 py-2">
+                            <div key={q.id} className={`flex items-start gap-2 rounded-md px-3 py-2 ${editingQId === q.id ? "bg-primary/10 border border-primary/30" : "bg-muted/40"}`}>
                               <span className="mt-0.5 text-xs font-bold text-primary">{i + 1}.</span>
                               <div className="min-w-0 flex-1">
                                 <div className="text-sm">{q.question_text}</div>
@@ -275,6 +303,9 @@ export function SurveyAdmin({
                                     : `Múltipla escolha: ${(q.options ?? []).join(", ")}`}
                                 </div>
                               </div>
+                              <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => startEditQuestion(q)}>
+                                <Pencil className="h-3 w-3 text-primary" />
+                              </Button>
                               <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => deleteQuestion(q.id)}>
                                 <X className="h-3 w-3 text-destructive" />
                               </Button>
@@ -282,8 +313,10 @@ export function SurveyAdmin({
                           ))}
                         </div>
 
-                        <div className="mt-3 space-y-2 rounded-lg border border-dashed border-border p-3">
-                          <p className="text-xs font-semibold text-muted-foreground">+ Adicionar pergunta</p>
+                        <div className={`mt-3 space-y-2 rounded-lg border p-3 ${editingQId ? "border-primary/40 bg-primary/5" : "border-dashed border-border"}`}>
+                          <p className="text-xs font-semibold text-muted-foreground">
+                            {editingQId ? "✏️ Editando pergunta" : "+ Adicionar pergunta"}
+                          </p>
                           <div className="flex gap-2">
                             <Input
                               className="h-8 flex-1 text-sm"
@@ -316,9 +349,18 @@ export function SurveyAdmin({
                               O aluno vai clicar de 1 a 5 estrelas
                             </p>
                           )}
-                          <Button size="sm" onClick={addQuestion} className="h-7 text-xs">
-                            <Plus className="mr-1 h-3 w-3" />Adicionar
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={saveQuestion} className="h-7 text-xs gradient-primary text-primary-foreground">
+                              {editingQId
+                                ? <><Save className="mr-1 h-3 w-3" />Salvar</>
+                                : <><Plus className="mr-1 h-3 w-3" />Adicionar</>}
+                            </Button>
+                            {editingQId && (
+                              <Button size="sm" variant="ghost" onClick={cancelEditQuestion} className="h-7 text-xs">
+                                Cancelar
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
