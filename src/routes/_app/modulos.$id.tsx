@@ -17,6 +17,7 @@ declare global { interface Window { __pandaEnded?: () => void; } }
 const LessonExtras = lazy(() =>
   import("@/components/LessonExtras").then((m) => ({ default: m.LessonExtras }))
 );
+import { SurveyForm } from "@/components/SurveyForm";
 
 const searchSchema = z.object({ aula: z.string().optional() });
 
@@ -64,6 +65,7 @@ function ModulePage() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [nextModuleId, setNextModuleId] = useState<string | null>(null);
+  const [activeSurveyId, setActiveSurveyId] = useState<string | null>(null);
 
   // Load module + lessons
   useEffect(() => {
@@ -106,6 +108,18 @@ function ModulePage() {
       setFavorites(new Set((favs.data ?? []).map((f) => f.lesson_id)));
     });
   }, [lessons, userId]);
+
+  // Carrega pesquisa vinculada à aula ativa
+  useEffect(() => {
+    if (!active?.id) { setActiveSurveyId(null); return; }
+    supabase
+      .from("surveys")
+      .select("id")
+      .eq("lesson_id", active.id)
+      .eq("is_active", true)
+      .maybeSingle()
+      .then(({ data }) => setActiveSurveyId((data as any)?.id ?? null));
+  }, [active?.id]);
 
   const fireConfetti = useCallback(async () => {
     const { default: confetti } = await import("canvas-confetti");
@@ -320,6 +334,9 @@ function ModulePage() {
                   <Suspense fallback={null}>
                     <LessonExtras lessonId={active.id} userId={userId} isAdmin={userData?.isAdmin ?? false} hideIfEmpty />
                   </Suspense>
+                )}
+                {!activeLocked && userId && activeSurveyId && (
+                  <SurveyForm surveyId={activeSurveyId} lessonId={active.id} userId={userId} />
                 )}
               </div>
             )}
