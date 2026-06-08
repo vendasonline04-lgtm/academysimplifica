@@ -66,8 +66,8 @@ function AuthPage() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
 
-  // Detect expired/invalid link errors from Supabase hash
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.includes("error=")) {
@@ -78,7 +78,6 @@ function AuthPage() {
     }
   }, []);
 
-  // Detect PASSWORD_RECOVERY event (Supabase clears the hash before useEffect sees it)
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") setMode("new-password");
@@ -92,6 +91,7 @@ function AuthPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setInlineError(null);
 
     if (mode === "signup" && password !== confirm) {
       toast.error("As senhas não coincidem");
@@ -120,15 +120,13 @@ function AuthPage() {
         const { error } = await supabase.auth.updateUser({ password });
         if (error) throw error;
         toast.success("Senha atualizada! Entrando na plataforma...");
-        // Reload completo para garantir que o Supabase reconheça a nova sessão
         setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/auth`,
         });
         if (error) throw error;
-        toast.success("Email de redefinição enviado! Verifique sua caixa de entrada.");
-        setMode("login");
+        setResetSent(true);
       }
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Erro inesperado";
@@ -169,105 +167,140 @@ function AuthPage() {
           </Link>
 
           <div className="glass-card rounded-2xl p-8 shadow-glow">
-            <h1 className="mb-1 text-2xl font-bold">{titles[mode]}</h1>
-            <p className="mb-6 text-sm text-muted-foreground">{subtitles[mode]}</p>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {mode !== "new-password" && (
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="voce@email.com"
-                  />
+            {resetSent ? (
+              <div className="flex flex-col items-center gap-5 py-4 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                  <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
                 </div>
-              )}
-
-              {mode !== "reset" && (
                 <div className="space-y-2">
-                  <Label htmlFor="password">{mode === "new-password" ? "Nova senha" : "Senha"}</Label>
-                  <PasswordInput
-                    id="password"
-                    value={password}
-                    onChange={setPassword}
-                    required
-                    minLength={6}
-                    autoComplete={mode === "new-password" ? "new-password" : "current-password"}
-                  />
+                  <h2 className="text-xl font-bold text-foreground">Email enviado!</h2>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Enviamos um link de redefinição para<br />
+                    <strong className="text-foreground">{email}</strong>
+                  </p>
                 </div>
-              )}
-
-              {(mode === "signup" || mode === "new-password") && (
-                <div className="space-y-2">
-                  <Label htmlFor="confirm">Confirme a senha</Label>
-                  <PasswordInput
-                    id="confirm"
-                    value={confirm}
-                    onChange={setConfirm}
-                    required
-                    minLength={6}
-                    autoComplete="new-password"
-                  />
+                <div className="w-full rounded-xl border border-green-200 bg-green-50 p-4 text-left space-y-2">
+                  <p className="text-sm font-semibold text-green-800">O que fazer agora:</p>
+                  <ol className="text-sm text-green-700 space-y-1 list-decimal list-inside">
+                    <li>Abra seu email</li>
+                    <li>Procure o email da Academy Simplifica-AI</li>
+                    <li>Clique no botão <strong>"Redefinir senha"</strong></li>
+                    <li>Crie sua nova senha</li>
+                  </ol>
                 </div>
-              )}
-
-              {mode === "login" && (
-                <div className="text-right">
+                <p className="text-xs text-muted-foreground">
+                  Não recebeu? Verifique a pasta de spam ou{" "}
                   <button
                     type="button"
-                    onClick={() => setMode("reset")}
-                    className="text-xs text-primary hover:underline"
+                    onClick={() => { setResetSent(false); setEmail(""); }}
+                    className="font-medium text-primary hover:underline"
                   >
-                    Esqueceu a senha?
+                    tente com outro email
                   </button>
+                </p>
+              </div>
+            ) : (
+              <div>
+                <h1 className="mb-1 text-2xl font-bold">{titles[mode]}</h1>
+                <p className="mb-6 text-sm text-muted-foreground">{subtitles[mode]}</p>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {mode !== "new-password" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="voce@email.com"
+                      />
+                    </div>
+                  )}
+
+                  {mode !== "reset" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="password">{mode === "new-password" ? "Nova senha" : "Senha"}</Label>
+                      <PasswordInput
+                        id="password"
+                        value={password}
+                        onChange={setPassword}
+                        required
+                        minLength={6}
+                        autoComplete={mode === "new-password" ? "new-password" : "current-password"}
+                      />
+                    </div>
+                  )}
+
+                  {(mode === "signup" || mode === "new-password") && (
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm">Confirme a senha</Label>
+                      <PasswordInput
+                        id="confirm"
+                        value={confirm}
+                        onChange={setConfirm}
+                        required
+                        minLength={6}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  )}
+
+                  {mode === "login" && (
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => setMode("reset")}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Esqueceu a senha?
+                      </button>
+                    </div>
+                  )}
+
+                  {inlineError && (
+                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                      <span className="mt-0.5 shrink-0">⚠️</span>
+                      <span>{inlineError}</span>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full gradient-primary text-primary-foreground shadow-glow"
+                  >
+                    {loading
+                      ? "Aguarde..."
+                      : mode === "login"
+                      ? "Entrar"
+                      : mode === "signup"
+                      ? "Cadastrar"
+                      : mode === "new-password"
+                      ? "Salvar nova senha"
+                      : "Enviar link de redefinição"}
+                  </Button>
+                </form>
+
+                <div className="mt-6 text-center text-sm text-muted-foreground space-y-2">
+                  {mode === "login" ? (
+                    <span>
+                      Não tem conta?{" "}
+                      <button onClick={() => setMode("signup")} className="font-medium text-primary hover:underline">
+                        Cadastre-se
+                      </button>
+                    </span>
+                  ) : (
+                    <button onClick={() => setMode("login")} className="font-medium text-primary hover:underline">
+                      ← Voltar para o login
+                    </button>
+                  )}
                 </div>
-              )}
-
-              {inlineError && (
-                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  <span className="mt-0.5 text-red-500 shrink-0">⚠️</span>
-                  <span>{inlineError}</span>
-                </div>
-              )}
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full gradient-primary text-primary-foreground shadow-glow"
-                onClick={() => setInlineError(null)}
-              >
-                {loading
-                  ? "Aguarde..."
-                  : mode === "login"
-                  ? "Entrar"
-                  : mode === "signup"
-                  ? "Cadastrar"
-                  : mode === "new-password"
-                  ? "Salvar nova senha"
-                  : "Enviar link de redefinição"}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center text-sm text-muted-foreground space-y-2">
-              {mode === "login" ? (
-                <>
-                  Não tem conta?{" "}
-                  <button onClick={() => setMode("signup")} className="font-medium text-primary hover:underline">
-                    Cadastre-se
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button onClick={() => setMode("login")} className="font-medium text-primary hover:underline">
-                    ← Voltar para o login
-                  </button>
-                </>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
