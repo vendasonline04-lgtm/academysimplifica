@@ -160,7 +160,7 @@ export function SurveyForm({
                 placeholder="Sua resposta..."
                 value={answers[q.id] ?? ""}
                 onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                rows={2}
+                rows={4}
                 className="resize-none"
               />
             ) : q.question_type === "choice" && q.options ? (
