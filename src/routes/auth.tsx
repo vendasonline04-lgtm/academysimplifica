@@ -15,9 +15,9 @@ export const Route = createFileRoute("/auth")({
 
 type Mode = "login" | "signup" | "reset" | "new-password";
 
-function PasswordInput({ id, value, onChange, placeholder, required, minLength }: {
+function PasswordInput({ id, value, onChange, placeholder, required, minLength, autoComplete }: {
   id: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; required?: boolean; minLength?: number;
+  placeholder?: string; required?: boolean; minLength?: number; autoComplete?: string;
 }) {
   const [show, setShow] = useState(false);
   return (
@@ -30,6 +30,7 @@ function PasswordInput({ id, value, onChange, placeholder, required, minLength }
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder ?? ""}
+        autoComplete={autoComplete ?? "current-password"}
         className="pr-10"
       />
       <button
@@ -105,8 +106,9 @@ function AuthPage() {
         }
         const { error } = await supabase.auth.updateUser({ password });
         if (error) throw error;
-        toast.success("Senha atualizada com sucesso!");
-        navigate({ to: "/dashboard" });
+        toast.success("Senha atualizada! Entrando na plataforma...");
+        // Reload completo para garantir que o Supabase reconheça a nova sessão
+        setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/auth`,
@@ -172,14 +174,28 @@ function AuthPage() {
               {mode !== "reset" && (
                 <div className="space-y-2">
                   <Label htmlFor="password">{mode === "new-password" ? "Nova senha" : "Senha"}</Label>
-                  <PasswordInput id="password" value={password} onChange={setPassword} required minLength={6} />
+                  <PasswordInput
+                    id="password"
+                    value={password}
+                    onChange={setPassword}
+                    required
+                    minLength={6}
+                    autoComplete={mode === "new-password" ? "new-password" : "current-password"}
+                  />
                 </div>
               )}
 
               {(mode === "signup" || mode === "new-password") && (
                 <div className="space-y-2">
                   <Label htmlFor="confirm">Confirme a senha</Label>
-                  <PasswordInput id="confirm" value={confirm} onChange={setConfirm} placeholder="••••••••" required minLength={6} />
+                  <PasswordInput
+                    id="confirm"
+                    value={confirm}
+                    onChange={setConfirm}
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                  />
                 </div>
               )}
 
