@@ -37,6 +37,7 @@ export interface Lesson {
   access_tier: AccessTier;
   published: boolean;
   sort_order: number;
+  survey_gate_lesson_id: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, PlayCircle, Check, Heart, Lock, Sparkles, Clock, Menu, X } from "lucide-react";
+import { ArrowLeft, PlayCircle, Check, Heart, Lock, Sparkles, Clock, Menu, X, ClipboardList, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import type { Lesson, Module } from "@/lib/database.types";
 import { SurveyForm } from "@/components/SurveyForm";
@@ -66,6 +66,7 @@ function ModulePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [nextModuleId, setNextModuleId] = useState<string | null>(null);
   const [activeSurveyId, setActiveSurveyId] = useState<string | null>(null);
+  const [surveyGatePopup, setSurveyGatePopup] = useState<{ blocked: Lesson; gate: Lesson } | null>(null);
 
   // Load module + lessons
   useEffect(() => {
@@ -120,6 +121,23 @@ function ModulePage() {
       .maybeSingle()
       .then(({ data }) => setActiveSurveyId((data as any)?.id ?? null));
   }, [active?.id]);
+
+  const handleLessonClick = useCallback(async (l: Lesson) => {
+    if (l.survey_gate_lesson_id && userId) {
+      const { data: resp } = await supabase
+        .from("survey_responses")
+        .select("id")
+        .eq("lesson_id", l.survey_gate_lesson_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!resp) {
+        const gateLesson = lessons.find((g) => g.id === l.survey_gate_lesson_id);
+        if (gateLesson) { setSurveyGatePopup({ blocked: l, gate: gateLesson }); return; }
+      }
+    }
+    setActive(l);
+    setSidebarOpen(false);
+  }, [lessons, userId]);
 
   const fireConfetti = useCallback(async () => {
     const { default: confetti } = await import("canvas-confetti");
@@ -220,6 +238,41 @@ function ModulePage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Popup de bloqueio por pesquisa */}
+      {surveyGatePopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-card rounded-2xl shadow-2xl p-8 w-full max-w-md space-y-5 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full gradient-primary shadow-glow">
+              <ClipboardList className="h-8 w-8 text-primary-foreground" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold">Sua opinião é muito importante!</h2>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Para liberar a aula <strong>"{surveyGatePopup.blocked.title}"</strong>, responda a pesquisa da{" "}
+                <strong>"{surveyGatePopup.gate.title}"</strong>.<br />
+                Assim que responder, o acesso será liberado automaticamente!
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                onClick={() => {
+                  setSurveyGatePopup(null);
+                  setActive(surveyGatePopup.gate);
+                  setSidebarOpen(false);
+                }}
+                className="gradient-primary text-primary-foreground gap-2"
+              >
+                <ArrowRight className="h-4 w-4" />
+                Ir para a pesquisa
+              </Button>
+              <Button variant="ghost" onClick={() => setSurveyGatePopup(null)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <div className="border-b border-border/40 bg-background/80 px-4 py-2 backdrop-blur flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm min-w-0">
@@ -373,7 +426,7 @@ function ModulePage() {
                     const lLocked = !hasCategoryGrant && !tierAllows(tier, l.access_tier);
                     const done = completed.has(l.id);
                     return (
-                      <button key={l.id} onClick={() => { setActive(l); setSidebarOpen(false); }}
+                      <button key={l.id} onClick={() => handleLessonClick(l)}
                         className={`w-full rounded-xl border p-3 text-left transition-all ${isActive ? "border-primary bg-primary/5 shadow-sm" : "border-border/60 bg-card hover:border-primary/40"}`}>
                         <div className="flex items-start gap-3">
                           <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${done ? "gradient-primary shadow-glow" : isActive ? "bg-primary/20" : "bg-muted"}`}>

@@ -320,7 +320,8 @@ function ModuleRow({ module: m, index, lessons, onChange, canUp, canDown, neighb
           {lessons.map((l, i) => (
             <LessonRow key={l.id} lesson={l} index={i + 1} onChange={onChange}
               canUp={i > 0} canDown={i < lessons.length - 1}
-              neighborUp={lessons[i - 1]} neighborDown={lessons[i + 1]} />
+              neighborUp={lessons[i - 1]} neighborDown={lessons[i + 1]}
+              moduleLessons={lessons} />
           ))}
           <div className="pt-1">
             <Button size="sm" variant="outline" onClick={() => setModal("lesson")} className="w-full border-dashed text-muted-foreground hover:text-primary text-xs">
@@ -398,9 +399,9 @@ function ModuleEditor({ module: m, onDone }: { module: Module; onDone: () => voi
   );
 }
 
-function LessonRow({ lesson, index, onChange, canUp, canDown, neighborUp, neighborDown }: {
+function LessonRow({ lesson, index, onChange, canUp, canDown, neighborUp, neighborDown, moduleLessons }: {
   lesson: Lesson; index: number; onChange: () => void;
-  canUp: boolean; canDown: boolean; neighborUp?: Lesson; neighborDown?: Lesson;
+  canUp: boolean; canDown: boolean; neighborUp?: Lesson; neighborDown?: Lesson; moduleLessons: Lesson[];
 }) {
   const [edit, setEdit] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -424,12 +425,12 @@ function LessonRow({ lesson, index, onChange, canUp, canDown, neighborUp, neighb
         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEdit(!edit)}><Pencil className="h-3.5 w-3.5" /></Button>
         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setConfirmDelete(true)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
       </div>
-      {edit && <div className="border-t px-3 py-3"><LessonEditor lesson={lesson} onDone={() => { setEdit(false); onChange(); }} /></div>}
+      {edit && <div className="border-t px-3 py-3"><LessonEditor lesson={lesson} moduleLessons={moduleLessons} onDone={() => { setEdit(false); onChange(); }} /></div>}
     </div>
   );
 }
 
-function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }) {
+function LessonEditor({ lesson, moduleLessons = [] }: { lesson: Lesson; onDone: () => void; moduleLessons?: Lesson[] }) {
   const qc = useQueryClient();
   const [title, setTitle] = useState(lesson.title);
   const [desc, setDesc] = useState(lesson.description ?? "");
@@ -439,6 +440,7 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
   );
   const [videoVal, setVideoVal] = useState(lesson.panda_embed_url ?? "");
   const [tier, setTier] = useState<AccessTier>(lesson.access_tier);
+  const [surveyGateId, setSurveyGateId] = useState<string>(lesson.survey_gate_lesson_id ?? "");
 
   // Materials
   const { data: materials, refetch: refetchMats } = useQuery({
@@ -483,6 +485,7 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
   const save = async () => {
     const { error } = await supabase.from("lessons").update({
       title, description: desc, panda_embed_url: videoVal, access_tier: tier, published,
+      survey_gate_lesson_id: surveyGateId || null,
     }).eq("id", lesson.id);
     if (error) toast.error(error.message); else { toast.success("Aula salva"); qc.invalidateQueries({ queryKey: ["admin-content"] }); onDone(); }
   };
@@ -542,6 +545,26 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
         <Label className="flex items-center gap-1"><Send className="h-3 w-3" /> Comentário/Aviso para alunos</Label>
         <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Escreva um comentário/aviso para os alunos..." rows={2} />
         <Button size="sm" variant="outline" onClick={saveComment}>Publicar aviso</Button>
+      </div>
+
+      {/* Gate de pesquisa */}
+      <div className="space-y-1.5">
+        <Label className="flex items-center gap-1.5">
+          <ClipboardList className="h-3.5 w-3.5 text-primary" />
+          Exige pesquisa respondida antes de assistir
+        </Label>
+        <p className="text-xs text-muted-foreground">Se selecionado, o aluno só acessa esta aula após responder a pesquisa da aula escolhida.</p>
+        <Select value={surveyGateId} onValueChange={setSurveyGateId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Sem restrição (acesso livre)" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Sem restrição (acesso livre)</SelectItem>
+            {moduleLessons.filter((l) => l.id !== lesson.id).map((l) => (
+              <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex items-center justify-between rounded-lg border p-3">
