@@ -66,7 +66,11 @@ function ModulePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [nextModuleId, setNextModuleId] = useState<string | null>(null);
   const [activeSurveyId, setActiveSurveyId] = useState<string | null>(null);
-  const [surveyGatePopup, setSurveyGatePopup] = useState<{ blocked: Lesson; gate: Lesson } | null>(null);
+  const [surveyGatePopup, setSurveyGatePopup] = useState<{
+    blocked: Lesson;
+    surveyTitle: string;
+    gateLesson: Lesson | null;
+  } | null>(null);
 
   // Load module + lessons
   useEffect(() => {
@@ -123,16 +127,22 @@ function ModulePage() {
   }, [active?.id]);
 
   const handleLessonClick = useCallback(async (l: Lesson) => {
-    if (l.survey_gate_lesson_id && userId) {
+    if (l.survey_gate_survey_id && userId) {
       const { data: resp } = await supabase
         .from("survey_responses")
         .select("id")
-        .eq("lesson_id", l.survey_gate_lesson_id)
+        .eq("survey_id", l.survey_gate_survey_id)
         .eq("user_id", userId)
         .maybeSingle();
       if (!resp) {
-        const gateLesson = lessons.find((g) => g.id === l.survey_gate_lesson_id);
-        if (gateLesson) { setSurveyGatePopup({ blocked: l, gate: gateLesson }); return; }
+        const { data: sv } = await supabase
+          .from("surveys")
+          .select("title, lesson_id")
+          .eq("id", l.survey_gate_survey_id)
+          .maybeSingle();
+        const gateLesson = sv?.lesson_id ? lessons.find((g) => g.id === sv.lesson_id) ?? null : null;
+        setSurveyGatePopup({ blocked: l, surveyTitle: (sv as any)?.title ?? "pesquisa", gateLesson });
+        return;
       }
     }
     setActive(l);
@@ -248,23 +258,30 @@ function ModulePage() {
             <div className="space-y-2">
               <h2 className="text-xl font-bold">Sua opinião é muito importante!</h2>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                Para liberar a aula <strong>"{surveyGatePopup.blocked.title}"</strong>, responda a pesquisa da{" "}
-                <strong>"{surveyGatePopup.gate.title}"</strong>.<br />
+                Para liberar a aula <strong>"{surveyGatePopup.blocked.title}"</strong>, responda a pesquisa{" "}
+                <strong>"{surveyGatePopup.surveyTitle}"</strong>
+                {surveyGatePopup.gateLesson && (
+                  <> da aula <strong>"{surveyGatePopup.gateLesson.title}"</strong></>
+                )}
+                .<br />
                 Assim que responder, o acesso será liberado automaticamente!
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button
-                onClick={() => {
-                  setSurveyGatePopup(null);
-                  setActive(surveyGatePopup.gate);
-                  setSidebarOpen(false);
-                }}
-                className="gradient-primary text-primary-foreground gap-2"
-              >
-                <ArrowRight className="h-4 w-4" />
-                Ir para a pesquisa
-              </Button>
+              {surveyGatePopup.gateLesson && (
+                <Button
+                  onClick={() => {
+                    const gate = surveyGatePopup.gateLesson!;
+                    setSurveyGatePopup(null);
+                    setActive(gate);
+                    setSidebarOpen(false);
+                  }}
+                  className="gradient-primary text-primary-foreground gap-2"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  Ir para a pesquisa
+                </Button>
+              )}
               <Button variant="ghost" onClick={() => setSurveyGatePopup(null)}>
                 Fechar
               </Button>

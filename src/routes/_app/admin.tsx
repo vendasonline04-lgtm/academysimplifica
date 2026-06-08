@@ -430,7 +430,7 @@ function LessonRow({ lesson, index, onChange, canUp, canDown, neighborUp, neighb
   );
 }
 
-function LessonEditor({ lesson, moduleLessons = [] }: { lesson: Lesson; onDone: () => void; moduleLessons?: Lesson[] }) {
+function LessonEditor({ lesson, onDone, moduleLessons = [] }: { lesson: Lesson; onDone: () => void; moduleLessons?: Lesson[] }) {
   const qc = useQueryClient();
   const [title, setTitle] = useState(lesson.title);
   const [desc, setDesc] = useState(lesson.description ?? "");
@@ -440,7 +440,14 @@ function LessonEditor({ lesson, moduleLessons = [] }: { lesson: Lesson; onDone: 
   );
   const [videoVal, setVideoVal] = useState(lesson.panda_embed_url ?? "");
   const [tier, setTier] = useState<AccessTier>(lesson.access_tier);
-  const [surveyGateId, setSurveyGateId] = useState<string>(lesson.survey_gate_lesson_id ?? "");
+  const [surveyGateId, setSurveyGateId] = useState<string>((lesson as any).survey_gate_survey_id ?? "");
+  const { data: allSurveys = [] } = useQuery({
+    queryKey: ["all-surveys-for-gate"],
+    queryFn: async () => {
+      const { data } = await supabase.from("surveys").select("id, title, lesson_id").eq("is_active", true).order("title");
+      return (data ?? []) as { id: string; title: string; lesson_id: string | null }[];
+    },
+  });
 
   // Materials
   const { data: materials, refetch: refetchMats } = useQuery({
@@ -485,7 +492,7 @@ function LessonEditor({ lesson, moduleLessons = [] }: { lesson: Lesson; onDone: 
   const save = async () => {
     const { error } = await supabase.from("lessons").update({
       title, description: desc, panda_embed_url: videoVal, access_tier: tier, published,
-      survey_gate_lesson_id: surveyGateId || null,
+      survey_gate_survey_id: surveyGateId || null,
     }).eq("id", lesson.id);
     if (error) toast.error(error.message); else { toast.success("Aula salva"); qc.invalidateQueries({ queryKey: ["admin-content"] }); onDone(); }
   };
@@ -560,9 +567,14 @@ function LessonEditor({ lesson, moduleLessons = [] }: { lesson: Lesson; onDone: 
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">Sem restrição (acesso livre)</SelectItem>
-            {moduleLessons.filter((l) => l.id !== lesson.id).map((l) => (
-              <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>
-            ))}
+            {allSurveys.map((sv) => {
+              const gateLessonTitle = moduleLessons.find((l) => l.id === sv.lesson_id)?.title;
+              return (
+                <SelectItem key={sv.id} value={sv.id}>
+                  {sv.title}{gateLessonTitle ? ` — (${gateLessonTitle})` : ""}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
       </div>
