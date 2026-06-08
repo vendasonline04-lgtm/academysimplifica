@@ -67,6 +67,9 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
+  const [subscriptionBlocked] = useState(
+    () => new URLSearchParams(window.location.search).get("acesso") === "bloqueado"
+  );
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -86,8 +89,13 @@ function AuthPage() {
   }, []);
 
   useEffect(() => {
+    if (subscriptionBlocked) {
+      // Desloga o usuário bloqueado para evitar navegação direta
+      supabase.auth.signOut();
+      return;
+    }
     if (mode !== "new-password" && user) navigate({ to: "/dashboard" });
-  }, [user, navigate, mode]);
+  }, [user, navigate, mode, subscriptionBlocked]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,6 +175,16 @@ function AuthPage() {
           </Link>
 
           <div className="glass-card rounded-2xl p-8 shadow-glow">
+            {subscriptionBlocked && (
+              <div className="mb-6 rounded-xl border border-orange-200 bg-orange-50 p-4 text-center space-y-2">
+                <p className="text-2xl">🔒</p>
+                <p className="font-bold text-orange-800 text-base">Acesso bloqueado</p>
+                <p className="text-sm text-orange-700 leading-relaxed">
+                  Sua assinatura está inativa ou cancelada.<br />
+                  Para acessar a plataforma, renove seu acesso e faça login novamente.
+                </p>
+              </div>
+            )}
             {resetSent ? (
               <div className="flex flex-col items-center gap-5 py-4 text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">

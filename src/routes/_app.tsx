@@ -9,6 +9,25 @@ export const Route = createFileRoute("/_app")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/auth" });
+
+    // Admin passa direto
+    try {
+      const { data: isAdmin } = await supabase.rpc("has_role" as never, {
+        _user_id: data.user.id, _role: "admin",
+      } as never);
+      if (isAdmin) return;
+    } catch { /* se RPC falhar, cai na verificação de assinatura */ }
+
+    // Verifica assinatura ativa
+    const { data: sub } = await supabase
+      .from("user_subscriptions")
+      .select("status")
+      .eq("user_id", data.user.id)
+      .maybeSingle();
+
+    if (!sub || sub.status !== "active") {
+      throw redirect({ to: "/auth?acesso=bloqueado" });
+    }
   },
   component: AppLayout,
 });
