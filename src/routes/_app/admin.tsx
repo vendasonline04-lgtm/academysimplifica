@@ -440,7 +440,7 @@ function LessonEditor({ lesson, onDone, moduleLessons = [] }: { lesson: Lesson; 
   );
   const [videoVal, setVideoVal] = useState(lesson.panda_embed_url ?? "");
   const [tier, setTier] = useState<AccessTier>(lesson.access_tier);
-  const [surveyGateId, setSurveyGateId] = useState<string>((lesson as any).survey_gate_survey_id ?? "");
+  const [surveyGateId, setSurveyGateId] = useState<string>((lesson as any).survey_gate_survey_id ?? "none");
   const { data: allSurveys = [] } = useQuery({
     queryKey: ["all-surveys-for-gate"],
     queryFn: async () => {
@@ -492,7 +492,7 @@ function LessonEditor({ lesson, onDone, moduleLessons = [] }: { lesson: Lesson; 
   const save = async () => {
     const { error } = await supabase.from("lessons").update({
       title, description: desc, panda_embed_url: videoVal, access_tier: tier, published,
-      survey_gate_survey_id: surveyGateId || null,
+      survey_gate_survey_id: surveyGateId === "none" ? null : surveyGateId,
     }).eq("id", lesson.id);
     if (error) toast.error(error.message); else { toast.success("Aula salva"); qc.invalidateQueries({ queryKey: ["admin-content"] }); onDone(); }
   };
@@ -566,7 +566,7 @@ function LessonEditor({ lesson, onDone, moduleLessons = [] }: { lesson: Lesson; 
             <SelectValue placeholder="Sem restrição (acesso livre)" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Sem restrição (acesso livre)</SelectItem>
+            <SelectItem value="none">Sem restrição (acesso livre)</SelectItem>
             {allSurveys.map((sv) => {
               const gateLessonTitle = moduleLessons.find((l) => l.id === sv.lesson_id)?.title;
               return (
