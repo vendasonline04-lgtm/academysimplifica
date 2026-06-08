@@ -25,9 +25,29 @@ export const Route = createFileRoute("/_app")({
       .eq("user_id", data.user.id)
       .maybeSingle();
 
-    if (!sub || sub.status !== "active") {
-      throw redirect({ to: "/auth?acesso=bloqueado" });
+    if (sub?.status === "active") return;
+
+    // Fallback: aluno pode ter comprado ANTES de criar conta
+    // O webhook grava em allowed_emails mas não em user_subscriptions nesse caso
+    const email = data.user.email?.toLowerCase().trim();
+    if (email) {
+      const { data: allowed } = await supabase
+        .from("allowed_emails")
+        .select("status, tier")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (allowed?.status === "active") {
+        // Cria o registro em user_subscriptions automaticamente
+        await supabase.from("user_subscriptions").upsert(
+          { user_id: data.user.id, tier: allowed.tier ?? "basic", status: "active", payment_provider: "cackto" },
+          { onConflict: "user_id" }
+        );
+        return;
+      }
     }
+
+    throw redirect({ to: "/auth?acesso=bloqueado" });
   },
   component: AppLayout,
 });
