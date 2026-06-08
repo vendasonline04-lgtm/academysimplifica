@@ -45,6 +45,18 @@ function PasswordInput({ id, value, onChange, placeholder, required, minLength, 
   );
 }
 
+function translateSupabaseError(msg: string): string {
+  const m = msg.toLowerCase();
+  if (m.includes("new password should be different")) return "A nova senha deve ser diferente da senha anterior. Por favor, escolha uma senha diferente.";
+  if (m.includes("password should be at least")) return "A senha deve ter pelo menos 6 caracteres.";
+  if (m.includes("invalid login credentials") || m.includes("invalid email or password")) return "Email ou senha incorretos. Verifique seus dados.";
+  if (m.includes("email not confirmed")) return "Email não confirmado. Verifique sua caixa de entrada.";
+  if (m.includes("user already registered")) return "Este email já está cadastrado. Faça login ou redefina sua senha.";
+  if (m.includes("rate limit")) return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
+  if (m.includes("token") && m.includes("expired")) return "O link expirou. Solicite um novo link de redefinição de senha.";
+  return msg;
+}
+
 function AuthPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -53,6 +65,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+  const [inlineError, setInlineError] = useState<string | null>(null);
 
   // Detect expired/invalid link errors from Supabase hash
   useEffect(() => {
@@ -118,7 +131,10 @@ function AuthPage() {
         setMode("login");
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erro inesperado");
+      const raw = err instanceof Error ? err.message : "Erro inesperado";
+      const translated = translateSupabaseError(raw);
+      setInlineError(translated);
+      toast.error(translated, { duration: 6000 });
     } finally {
       setLoading(false);
     }
@@ -211,10 +227,18 @@ function AuthPage() {
                 </div>
               )}
 
+              {inlineError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <span className="mt-0.5 text-red-500 shrink-0">⚠️</span>
+                  <span>{inlineError}</span>
+                </div>
+              )}
+
               <Button
                 type="submit"
                 disabled={loading}
                 className="w-full gradient-primary text-primary-foreground shadow-glow"
+                onClick={() => setInlineError(null)}
               >
                 {loading
                   ? "Aguarde..."
