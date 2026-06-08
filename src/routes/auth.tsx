@@ -13,7 +13,7 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-type Mode = "login" | "signup" | "reset";
+type Mode = "login" | "signup" | "reset" | "new-password";
 
 function PasswordInput({ id, value, onChange, placeholder, required, minLength }: {
   id: string; value: string; onChange: (v: string) => void;
@@ -53,9 +53,28 @@ function AuthPage() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Detect expired/invalid link errors from Supabase hash
   useEffect(() => {
-    if (user) navigate({ to: "/dashboard" });
-  }, [user, navigate]);
+    const hash = window.location.hash;
+    if (hash.includes("error=")) {
+      const params = new URLSearchParams(hash.replace(/^#/, ""));
+      const desc = params.get("error_description");
+      if (desc) toast.error(decodeURIComponent(desc.replace(/\+/g, " ")));
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
+  // Detect PASSWORD_RECOVERY event (Supabase clears the hash before useEffect sees it)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setMode("new-password");
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (mode !== "new-password" && user) navigate({ to: "/dashboard" });
+  }, [user, navigate, mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +89,7 @@ function AuthPage() {
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        toast.success("Bem-vinda de volta!");
+        toast.success("Bem-vindo(a) de volta!");
       } else if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
@@ -79,6 +98,15 @@ function AuthPage() {
         });
         if (error) throw error;
         toast.success("Cadastro realizado! Verifique seu email se necessário.");
+      } else if (mode === "new-password") {
+        if (password !== confirm) {
+          toast.error("As senhas não coincidem");
+          return;
+        }
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        toast.success("Senha atualizada com sucesso!");
+        navigate({ to: "/dashboard" });
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/auth`,
@@ -95,15 +123,17 @@ function AuthPage() {
   };
 
   const titles: Record<Mode, string> = {
-    login: "Bem-vinda de volta",
+    login: "Bem-vindo(a) de volta",
     signup: "Criar conta",
     reset: "Redefinir senha",
+    "new-password": "Criar nova senha",
   };
 
   const subtitles: Record<Mode, string> = {
     login: "Entre com seu email e senha",
     signup: "Comece sua jornada na Academy Simplifica-AI",
     reset: "Informe seu email e enviaremos um link para redefinir sua senha",
+    "new-password": "Digite e confirme sua nova senha",
   };
 
   return (
@@ -125,28 +155,30 @@ function AuthPage() {
             <p className="mb-6 text-sm text-muted-foreground">{subtitles[mode]}</p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="voce@email.com"
-                />
-              </div>
+              {mode !== "new-password" && (
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="voce@email.com"
+                  />
+                </div>
+              )}
 
               {mode !== "reset" && (
                 <div className="space-y-2">
-                  <Label htmlFor="password">Senha</Label>
+                  <Label htmlFor="password">{mode === "new-password" ? "Nova senha" : "Senha"}</Label>
                   <PasswordInput id="password" value={password} onChange={setPassword} required minLength={6} />
                 </div>
               )}
 
-              {mode === "signup" && (
+              {(mode === "signup" || mode === "new-password") && (
                 <div className="space-y-2">
-                  <Label htmlFor="confirm">Repita a senha</Label>
+                  <Label htmlFor="confirm">Confirme a senha</Label>
                   <PasswordInput id="confirm" value={confirm} onChange={setConfirm} placeholder="••••••••" required minLength={6} />
                 </div>
               )}
@@ -174,6 +206,8 @@ function AuthPage() {
                   ? "Entrar"
                   : mode === "signup"
                   ? "Cadastrar"
+                  : mode === "new-password"
+                  ? "Salvar nova senha"
                   : "Enviar link de redefinição"}
               </Button>
             </form>

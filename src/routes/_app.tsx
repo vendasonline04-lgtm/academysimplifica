@@ -9,6 +9,19 @@ export const Route = createFileRoute("/_app")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/auth" });
+
+    const { data: isAdmin } = await supabase.rpc("has_role" as never, {
+      _user_id: data.user.id, _role: "admin",
+    } as never);
+    if (isAdmin) return;
+
+    const { data: sub } = await supabase
+      .from("user_subscriptions")
+      .select("status")
+      .eq("user_id", data.user.id)
+      .maybeSingle();
+
+    if (!sub || sub.status !== "active") throw redirect({ to: "/auth" });
   },
   component: AppLayout,
 });
