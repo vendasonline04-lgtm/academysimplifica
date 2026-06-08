@@ -751,7 +751,7 @@ function WebhookManager() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["webhook-products"] });
 
-  const webhookUrl = "https://academy.simplifica-ai.com/api/public/cackto/webhook";
+  const webhookUrl = "https://lzfqofifjdzcqnglugrc.supabase.co/functions/v1/cackto-webhook";
 
   const copyUrl = () => {
     navigator.clipboard.writeText(webhookUrl);
