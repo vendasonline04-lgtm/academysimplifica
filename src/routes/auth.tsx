@@ -29,7 +29,7 @@ function PasswordInput({ id, value, onChange, placeholder, required, minLength }
         minLength={minLength}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder ?? "••••••••"}
+        placeholder={placeholder ?? ""}
         className="pr-10"
       />
       <button
