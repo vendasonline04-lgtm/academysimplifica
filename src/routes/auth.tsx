@@ -109,8 +109,12 @@ function AuthPage() {
     setLoading(true);
     try {
       if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error, data: loginData } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        // Registra último acesso
+        if (loginData.user) {
+          supabase.rpc("record_user_event" as never, { p_user_id: loginData.user.id, p_event: "login" } as never).then(() => {});
+        }
         toast.success("Bem-vindo(a) de volta!");
       } else if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
@@ -125,8 +129,12 @@ function AuthPage() {
           toast.error("As senhas não coincidem");
           return;
         }
-        const { error } = await supabase.auth.updateUser({ password });
+        const { error, data: updData } = await supabase.auth.updateUser({ password });
         if (error) throw error;
+        // Registra que conseguiu resetar a senha
+        if (updData.user) {
+          supabase.rpc("record_user_event" as never, { p_user_id: updData.user.id, p_event: "password_reset" } as never).then(() => {});
+        }
         toast.success("Senha atualizada! Entrando na plataforma...");
         setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
       } else {

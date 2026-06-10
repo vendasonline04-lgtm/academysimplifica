@@ -1070,12 +1070,16 @@ function SubscriptionsManager() {
             <th className="p-3">Tier</th>
             <th className="p-3">Status</th>
             <th className="p-3">Desde</th>
+            <th className="p-3">Senha resetada</th>
+            <th className="p-3">Último acesso</th>
             <th className="p-3"></th>
           </tr>
         </thead>
         <tbody>
           {data.subs.map((s) => {
             const p = profileById(s.user_id);
+            const sub = s as any;
+            const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : null;
             return (
               <tr key={s.id} className="border-b">
                 <td className="p-3">{p?.full_name ?? s.user_id.slice(0, 8)}</td>
@@ -1091,6 +1095,16 @@ function SubscriptionsManager() {
                 </td>
                 <td className="p-3"><Badge variant={s.status === "active" ? "default" : "secondary"}>{s.status}</Badge></td>
                 <td className="p-3 text-muted-foreground">{new Date(s.created_at).toLocaleDateString("pt-BR")}</td>
+                <td className="p-3">
+                  {fmtDate(sub.password_reset_at)
+                    ? <span className="text-green-600 font-medium text-xs">✓ {fmtDate(sub.password_reset_at)}</span>
+                    : <span className="text-muted-foreground text-xs">—</span>}
+                </td>
+                <td className="p-3">
+                  {fmtDate(sub.last_login_at)
+                    ? <span className="text-green-600 font-medium text-xs">✓ {fmtDate(sub.last_login_at)}</span>
+                    : <span className="text-muted-foreground text-xs">Nunca</span>}
+                </td>
                 <td className="p-3 text-right">
                   {s.status === "active" && (
                     <Button size="sm" variant="outline" onClick={() => cancel(s.id)}>Cancelar</Button>
