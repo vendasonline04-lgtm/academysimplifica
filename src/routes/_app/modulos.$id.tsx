@@ -247,7 +247,7 @@ function ModulePage() {
   );
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex flex-1 flex-col overflow-x-hidden w-full">
       {/* Popup de bloqueio por pesquisa */}
       {surveyGatePopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -291,19 +291,15 @@ function ModulePage() {
       )}
 
       {/* Breadcrumb */}
-      <div className="border-b border-border/40 bg-background/80 px-4 py-2 backdrop-blur flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm min-w-0">
+      <div className="border-b border-border/40 bg-background/80 px-3 py-2 backdrop-blur flex items-center justify-between w-full overflow-hidden">
+        <div className="flex items-center gap-1 text-sm min-w-0 overflow-hidden">
           <Button asChild variant="ghost" size="sm" className="h-8 px-2 shrink-0">
             <Link to="/dashboard"><ArrowLeft className="mr-1 h-4 w-4" />Início</Link>
           </Button>
-          {(mod as any).category && (
-            <><span className="text-muted-foreground">/</span>
-            <span className="text-muted-foreground truncate max-w-[120px]">{(mod as any).category.title}</span></>
-          )}
-          <span className="text-muted-foreground">/</span>
-          <span className="font-semibold truncate max-w-[160px] sm:max-w-xs">{mod.title}</span>
+          <span className="text-muted-foreground shrink-0">/</span>
+          <span className="font-semibold truncate">{mod.title}</span>
         </div>
-        <button className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium lg:hidden shrink-0" onClick={() => setSidebarOpen((v) => !v)}>
+        <button className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium lg:hidden shrink-0 ml-2" onClick={() => setSidebarOpen((v) => !v)}>
           {sidebarOpen ? <X size={14} /> : <Menu size={14} />}<span>Aulas</span>
         </button>
       </div>
@@ -315,10 +311,10 @@ function ModulePage() {
       ) : (
         <div className="flex flex-1 overflow-hidden">
           {/* Main */}
-          <div className="flex flex-1 flex-col overflow-y-auto">
+          <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
             {/* Video area */}
-            <div className="w-full bg-gradient-to-b from-primary/10 via-primary/5 to-background px-4 pt-5 pb-6">
-              <div className="mx-auto max-w-3xl">
+            <div className="w-full bg-gradient-to-b from-primary/10 via-primary/5 to-background px-3 sm:px-4 pt-4 pb-6">
+              <div className="mx-auto max-w-3xl w-full">
                 {active && (
                   <p className="mb-3 text-xs font-bold uppercase tracking-widest text-primary">
                     Aula {activeIdx + 1} de {lessons.length}
@@ -356,8 +352,8 @@ function ModulePage() {
 
                 {/* Title + action buttons */}
                 {active && (
-                  <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-                    <h2 className="text-lg font-bold sm:text-xl">{active.title}</h2>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+                    <h2 className="text-base font-bold sm:text-xl leading-tight">{active.title}</h2>
                     {!activeLocked && (
                       <div className="flex flex-wrap gap-2">
                         <Button size="sm" onClick={toggleComplete}
