@@ -70,8 +70,8 @@ function Dashboard() {
     <div className="space-y-12">
       <PreviewBanner />
       <div>
-        <h1 className="text-3xl font-bold">Bem-vindo de volta</h1>
-        <p className="mt-1 text-muted-foreground">Continue de onde parou ou explore novos módulos.</p>
+        <h1 className="text-2xl font-bold sm:text-3xl">Bem-vindo de volta</h1>
+        <p className="mt-1 text-sm sm:text-base text-muted-foreground">Continue de onde parou ou explore novos módulos.</p>
       </div>
       {data.categories.map((cat) => (
         <CategorySection
@@ -97,7 +97,7 @@ function CategorySection({ category, modules, previewMode }: { category: Categor
     <section>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">{category.title}</h2>
+          <h2 className="text-xl font-semibold sm:text-2xl">{category.title}</h2>
           {category.description && <p className="text-sm text-muted-foreground">{category.description}</p>}
         </div>
         <div className="flex gap-1">

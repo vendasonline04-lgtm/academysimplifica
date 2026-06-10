@@ -60,7 +60,7 @@ function AppLayout() {
           <AppSidebar />
           <div className="flex flex-1 flex-col">
             <Header />
-            <main className="flex-1 p-4 md:p-8">
+            <main className="flex-1 p-3 sm:p-4 md:p-8 overflow-x-hidden">
               <Outlet />
             </main>
           </div>

@@ -30,13 +30,13 @@ function Index() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto flex max-w-4xl flex-col items-center px-6 pt-16 pb-24 text-center md:pt-28">
+      <main className="relative z-10 mx-auto flex max-w-4xl flex-col items-center px-4 sm:px-6 pt-10 pb-16 text-center sm:pt-16 md:pt-28">
         <Badge variant="secondary" className="glass-card mb-6 gap-1 rounded-full px-4 py-1.5 text-xs font-medium">
           <Sparkles className="h-3 w-3 text-primary" />
           Acesso Exclusivo
         </Badge>
 
-        <h1 className="text-5xl font-bold tracking-tight md:text-7xl">
+        <h1 className="text-3xl font-bold tracking-tight sm:text-5xl md:text-7xl">
           A área de membros que te ensina
           <br />
           <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.25_330)] bg-clip-text text-transparent">
@@ -44,7 +44,7 @@ function Index() {
           </span>
         </h1>
 
-        <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
+        <p className="mt-6 max-w-2xl text-base sm:text-lg text-muted-foreground">
           Para qualquer pessoa. Do zero ao avançado. Sem código. Sem complicação. Com resultado.
         </p>
 
