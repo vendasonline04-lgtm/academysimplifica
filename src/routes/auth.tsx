@@ -90,8 +90,8 @@ function AuthPage() {
 
   useEffect(() => {
     if (subscriptionBlocked) {
-      // Desloga o usuário bloqueado para evitar navegação direta
-      supabase.auth.signOut();
+      // Desloga apenas se ainda há sessão ativa
+      if (user) supabase.auth.signOut();
       return;
     }
     if (mode !== "new-password" && user) navigate({ to: "/dashboard" });
