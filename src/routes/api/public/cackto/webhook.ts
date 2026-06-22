@@ -117,13 +117,14 @@ export const Route = createFileRoute("/api/public/cackto/webhook")({
         const offerId = data?.offer?.id ?? data?.product?.id ?? null;
         const offerName = data?.offer?.name ?? data?.product?.name ?? null;
         const amount = typeof data?.amount === "number" ? data.amount : null;
+        const netAmount = typeof data?.commissions?.totalAmount === "number" ? data.commissions.totalAmount : null;
         const status = mapStatus(event);
 
         // 2) Idempotência
         const externalId = `${orderId}:${event}`;
         const { error: dupErr } = await supabaseAdmin
           .from("cackto_orders")
-          .insert({ external_id: externalId, event, status: status ?? "unknown", email, name, phone, cpf, offer_id: offerId, offer_name: offerName, amount })
+          .insert({ external_id: externalId, event, status: status ?? "unknown", email, name, phone, cpf, offer_id: offerId, offer_name: offerName, amount, net_amount: netAmount })
           .select("id").single();
 
         if (dupErr) {
