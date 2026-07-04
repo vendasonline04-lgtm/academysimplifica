@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useSearch } from "@tanstack/react-router";
+﻿import { createFileRoute, redirect, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { useQuery, useQueryClient, useQueryClient as useQC } from "@tanstack/react-query";
@@ -16,12 +16,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Calendar, GripVertical, ChevronUp, ChevronDown, Webhook, Copy, CheckCircle2, Video, Search, Library } from "lucide-react";
+import { Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Eye, EyeOff, Calendar, GripVertical, ChevronUp, ChevronDown, Webhook, Copy, CheckCircle2, ClipboardList, TrendingUp, Video, Search, Library } from "lucide-react";
 import { toast } from "sonner";
 import type { AccessTier, AppRole, Category, Module, Lesson, UserSubscription, Profile, WebhookProduct, VideoLibrary } from "@/lib/database.types";
+import { SurveyAdmin } from "@/components/admin/SurveyAdmin";
+import { AnalyticsAdmin } from "@/components/admin/AnalyticsAdmin";
 
 const adminSearchSchema = z.object({
-  tab: z.enum(["content", "subs", "clientes", "webhook", "view", "biblioteca"]).optional(),
+  tab: z.enum(["content", "biblioteca", "subs", "clientes", "webhook", "view", "surveys", "analytics"]).optional(),
 });
 
 export const Route = createFileRoute("/_app/admin")({
@@ -48,6 +50,8 @@ function AdminPage() {
           <TabsTrigger value="subs">Assinaturas</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
           <TabsTrigger value="webhook">Webhook</TabsTrigger>
+          <TabsTrigger value="analytics"><TrendingUp className="mr-1 h-4 w-4" />Análises</TabsTrigger>
+          <TabsTrigger value="surveys"><ClipboardList className="mr-1 h-4 w-4" />Pesquisas</TabsTrigger>
           <TabsTrigger value="view">Visualização</TabsTrigger>
         </TabsList>
         <TabsContent value="content" className="mt-6"><ContentManager /></TabsContent>
@@ -55,10 +59,34 @@ function AdminPage() {
         <TabsContent value="subs" className="mt-6"><SubscriptionsManager /></TabsContent>
         <TabsContent value="clientes" className="mt-6"><ClientesManager /></TabsContent>
         <TabsContent value="webhook" className="mt-6"><WebhookManager /></TabsContent>
+        <TabsContent value="analytics" className="mt-6"><AnalyticsAdmin /></TabsContent>
+        <TabsContent value="surveys" className="mt-6"><SurveysManager /></TabsContent>
         <TabsContent value="view" className="mt-6"><StructureView /></TabsContent>
       </Tabs>
     </div>
   );
+}
+
+/* ------------------- Surveys Manager ------------------- */
+
+function SurveysManager() {
+  const { data } = useQuery({
+    queryKey: ["admin-surveys-refs"],
+    queryFn: async () => {
+      const [l, p] = await Promise.all([
+        supabase.from("lessons").select("id, title").order("sort_order"),
+        supabase.from("profiles").select("user_id, full_name"),
+      ]);
+      return {
+        lessons: (l.data ?? []) as { id: string; title: string }[],
+        profiles: (p.data ?? []) as { user_id: string; full_name: string | null }[],
+      };
+    },
+  });
+
+  if (!data) return <div className="text-muted-foreground">Carregando...</div>;
+
+  return <SurveyAdmin lessons={data.lessons} profiles={data.profiles} />;
 }
 
 /* ------------------- Content Manager ------------------- */
@@ -294,7 +322,8 @@ function ModuleRow({ module: m, index, lessons, onChange, canUp, canDown, neighb
           {lessons.map((l, i) => (
             <LessonRow key={l.id} lesson={l} index={i + 1} onChange={onChange}
               canUp={i > 0} canDown={i < lessons.length - 1}
-              neighborUp={lessons[i - 1]} neighborDown={lessons[i + 1]} />
+              neighborUp={lessons[i - 1]} neighborDown={lessons[i + 1]}
+              moduleLessons={lessons} />
           ))}
           <div className="pt-1">
             <Button size="sm" variant="outline" onClick={() => setModal("lesson")} className="w-full border-dashed text-muted-foreground hover:text-primary text-xs">
@@ -372,9 +401,9 @@ function ModuleEditor({ module: m, onDone }: { module: Module; onDone: () => voi
   );
 }
 
-function LessonRow({ lesson, index, onChange, canUp, canDown, neighborUp, neighborDown }: {
+function LessonRow({ lesson, index, onChange, canUp, canDown, neighborUp, neighborDown, moduleLessons }: {
   lesson: Lesson; index: number; onChange: () => void;
-  canUp: boolean; canDown: boolean; neighborUp?: Lesson; neighborDown?: Lesson;
+  canUp: boolean; canDown: boolean; neighborUp?: Lesson; neighborDown?: Lesson; moduleLessons: Lesson[];
 }) {
   const [edit, setEdit] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -398,12 +427,12 @@ function LessonRow({ lesson, index, onChange, canUp, canDown, neighborUp, neighb
         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEdit(!edit)}><Pencil className="h-3.5 w-3.5" /></Button>
         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setConfirmDelete(true)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
       </div>
-      {edit && <div className="border-t px-3 py-3"><LessonEditor lesson={lesson} onDone={() => { setEdit(false); onChange(); }} /></div>}
+      {edit && <div className="border-t px-3 py-3"><LessonEditor lesson={lesson} moduleLessons={moduleLessons} onDone={() => { setEdit(false); onChange(); }} /></div>}
     </div>
   );
 }
 
-function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }) {
+function LessonEditor({ lesson, onDone, moduleLessons = [] }: { lesson: Lesson; onDone: () => void; moduleLessons?: Lesson[] }) {
   const qc = useQueryClient();
   const [title, setTitle] = useState(lesson.title);
   const [desc, setDesc] = useState(lesson.description ?? "");
@@ -426,6 +455,14 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
     !libSearch || v.title.toLowerCase().includes(libSearch.toLowerCase())
   );
   const [tier, setTier] = useState<AccessTier>(lesson.access_tier);
+  const [surveyGateId, setSurveyGateId] = useState<string>((lesson as any).survey_gate_survey_id ?? "none");
+  const { data: allSurveys = [] } = useQuery({
+    queryKey: ["all-surveys-for-gate"],
+    queryFn: async () => {
+      const { data } = await supabase.from("surveys").select("id, title, lesson_id").eq("is_active", true).order("title");
+      return (data ?? []) as { id: string; title: string; lesson_id: string | null }[];
+    },
+  });
 
   // Materials
   const { data: materials, refetch: refetchMats } = useQuery({
@@ -470,6 +507,7 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
   const save = async () => {
     const { error } = await supabase.from("lessons").update({
       title, description: desc, panda_embed_url: videoVal, access_tier: tier, published,
+      survey_gate_survey_id: surveyGateId === "none" ? null : surveyGateId,
     }).eq("id", lesson.id);
     if (error) toast.error(error.message); else { toast.success("Aula salva"); qc.invalidateQueries({ queryKey: ["admin-content"] }); onDone(); }
   };
@@ -579,6 +617,31 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
         <Label className="flex items-center gap-1"><Send className="h-3 w-3" /> Comentário/Aviso para alunos</Label>
         <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Escreva um comentário/aviso para os alunos..." rows={2} />
         <Button size="sm" variant="outline" onClick={saveComment}>Publicar aviso</Button>
+      </div>
+
+      {/* Gate de pesquisa */}
+      <div className="space-y-1.5">
+        <Label className="flex items-center gap-1.5">
+          <ClipboardList className="h-3.5 w-3.5 text-primary" />
+          Exige pesquisa respondida antes de assistir
+        </Label>
+        <p className="text-xs text-muted-foreground">Se selecionado, o aluno só acessa esta aula após responder a pesquisa da aula escolhida.</p>
+        <Select value={surveyGateId} onValueChange={setSurveyGateId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Sem restrição (acesso livre)" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Sem restrição (acesso livre)</SelectItem>
+            {allSurveys.map((sv) => {
+              const gateLessonTitle = moduleLessons.find((l) => l.id === sv.lesson_id)?.title;
+              return (
+                <SelectItem key={sv.id} value={sv.id}>
+                  {sv.title}{gateLessonTitle ? ` — (${gateLessonTitle})` : ""}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex items-center justify-between rounded-lg border p-3">
@@ -817,7 +880,7 @@ function VideoLibraryManager() {
 
 /* ------------------- Webhook Manager ------------------- */
 
-type EditingProduct = { id: string | null; name: string; price: number; category_ids: string[] };
+type EditingProduct = { id: string | null; name: string; price: number; category_ids: string[]; cackto_secret: string };
 
 function SetupModal({ onClose }: { onClose: () => void }) {
   const [pat, setPat] = useState("");
@@ -902,6 +965,7 @@ function WebhookManager() {
   const [editing, setEditing] = useState<EditingProduct | null>(null);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
 
   const { data: products = [], isLoading: loadingProducts, error: productsError } = useQuery({
@@ -927,9 +991,7 @@ function WebhookManager() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["webhook-products"] });
 
-  const webhookUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/api/public/cackto/webhook`
-    : "/api/public/cackto/webhook";
+  const webhookUrl = "https://lzfqofifjdzcqnglugrc.supabase.co/functions/v1/cackto-webhook";
 
   const copyUrl = () => {
     navigator.clipboard.writeText(webhookUrl);
@@ -939,10 +1001,10 @@ function WebhookManager() {
   };
 
   const startNew = () =>
-    setEditing({ id: null, name: "", price: 0, category_ids: [] });
+    setEditing({ id: null, name: "", price: 0, category_ids: [], cackto_secret: "" });
 
   const startEdit = (p: WebhookProduct) =>
-    setEditing({ id: p.id, name: p.name, price: p.price, category_ids: p.category_ids });
+    setEditing({ id: p.id, name: p.name, price: p.price, category_ids: p.category_ids, cackto_secret: p.cackto_secret ?? "" });
 
   const saveProduct = async () => {
     if (!editing || !editing.name.trim()) return;
@@ -951,14 +1013,14 @@ function WebhookManager() {
       if (editing.id) {
         const { error } = await supabase
           .from("webhook_products" as any)
-          .update({ name: editing.name, price: editing.price, category_ids: editing.category_ids })
+          .update({ name: editing.name, price: editing.price, category_ids: editing.category_ids, cackto_secret: editing.cackto_secret || null })
           .eq("id", editing.id);
         if (error) throw error;
         toast.success("Produto atualizado!");
       } else {
         const { error } = await supabase
           .from("webhook_products" as any)
-          .insert({ name: editing.name, price: editing.price, category_ids: editing.category_ids });
+          .insert({ name: editing.name, price: editing.price, category_ids: editing.category_ids, cackto_secret: editing.cackto_secret || null });
         if (error) throw error;
         toast.success("Produto criado!");
       }
@@ -1068,6 +1130,10 @@ function WebhookManager() {
                   <p className="text-xs text-muted-foreground">
                     {(p.price / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                   </p>
+                  {p.cackto_secret
+                    ? <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">🔑 Secret configurado</span>
+                    : <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-700">⚠️ Sem secret</span>
+                  }
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(p)}>
@@ -1124,6 +1190,29 @@ function WebhookManager() {
                   min={0}
                   step={0.01}
                 />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Chave Secreta da Cackto</Label>
+              <p className="text-xs text-muted-foreground">Cole aqui o secret gerado pela Cackto para este produto/oferta</p>
+              <div className="relative flex gap-2">
+                <Input
+                  type={showSecret ? "text" : "password"}
+                  value={editing.cackto_secret}
+                  onChange={(e) => setEditing({ ...editing, cackto_secret: e.target.value })}
+                  placeholder="sk_..."
+                  className="flex-1 font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 h-9 w-9"
+                  onClick={() => setShowSecret(!showSecret)}
+                >
+                  {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
               </div>
             </div>
 
@@ -1221,12 +1310,16 @@ function SubscriptionsManager() {
             <th className="p-3">Tier</th>
             <th className="p-3">Status</th>
             <th className="p-3">Desde</th>
+            <th className="p-3">Senha resetada</th>
+            <th className="p-3">Último acesso</th>
             <th className="p-3"></th>
           </tr>
         </thead>
         <tbody>
           {data.subs.map((s) => {
             const p = profileById(s.user_id);
+            const sub = s as any;
+            const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : null;
             return (
               <tr key={s.id} className="border-b">
                 <td className="p-3">{p?.full_name ?? s.user_id.slice(0, 8)}</td>
@@ -1242,6 +1335,16 @@ function SubscriptionsManager() {
                 </td>
                 <td className="p-3"><Badge variant={s.status === "active" ? "default" : "secondary"}>{s.status}</Badge></td>
                 <td className="p-3 text-muted-foreground">{new Date(s.created_at).toLocaleDateString("pt-BR")}</td>
+                <td className="p-3">
+                  {fmtDate(sub.password_reset_at)
+                    ? <span className="text-green-600 font-medium text-xs">✓ {fmtDate(sub.password_reset_at)}</span>
+                    : <span className="text-muted-foreground text-xs">—</span>}
+                </td>
+                <td className="p-3">
+                  {fmtDate(sub.last_login_at)
+                    ? <span className="text-green-600 font-medium text-xs">✓ {fmtDate(sub.last_login_at)}</span>
+                    : <span className="text-muted-foreground text-xs">Nunca</span>}
+                </td>
                 <td className="p-3 text-right">
                   {s.status === "active" && (
                     <Button size="sm" variant="outline" onClick={() => cancel(s.id)}>Cancelar</Button>
@@ -1258,85 +1361,62 @@ function SubscriptionsManager() {
 
 /* ------------------- Clientes (CRM) ------------------- */
 
-type CacktoOrder = {
-  id: string; external_id: string | null; event: string; status: string;
-  email: string | null; name: string | null; phone: string | null; cpf: string | null;
-  offer_name: string | null; amount: number | null; created_at: string;
-};
-
-const STATUS_STYLE: Record<string, string> = {
-  paid: "bg-green-100 text-green-800",
-  refunded: "bg-red-100 text-red-800",
-  canceled: "bg-gray-100 text-gray-700",
-  pending: "bg-yellow-100 text-yellow-800",
-  unknown: "bg-gray-100 text-gray-500",
-};
-const STATUS_LABEL: Record<string, string> = {
-  paid: "Pago", refunded: "Reembolso", canceled: "Cancelado", pending: "Pendente", unknown: "Desconhecido",
+type AdminCliente = {
+  id: string; external_id: string | null;
+  nome_completo: string | null; cpf: string | null; email: string | null; telefone: string | null;
+  produto: string | null; tipo_oferta: string | null; valor: number | null;
+  status: string; data_compra: string | null; hora_compra: string | null; created_at: string;
 };
 
 function ClientesManager() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
 
-  const { data: orders } = useQuery({
-    queryKey: ["crm-orders"],
+  const { data: clientes } = useQuery({
+    queryKey: ["crm-clientes"],
     queryFn: async () => {
       const { data } = await supabase
-        .from("cackto_orders" as any)
+        .from("admin_clientes" as any)
         .select("*")
         .order("created_at", { ascending: false });
-      return (data ?? []) as CacktoOrder[];
+      return (data ?? []) as AdminCliente[];
     },
   });
 
-  const filtered = (orders ?? []).filter((o) => {
-    const matchStatus = statusFilter === "all" || o.status === statusFilter;
+  const filtered = (clientes ?? []).filter((o) => {
     const q = search.toLowerCase();
-    const matchSearch = !q || [o.email, o.name, o.phone, o.cpf, o.offer_name].some((v) => v?.toLowerCase().includes(q));
-    return matchStatus && matchSearch;
+    return !q || [o.email, o.nome_completo, o.cpf, o.telefone].some((v) => v?.toLowerCase().includes(q));
   });
 
-  const totalPaid = (orders ?? []).filter((o) => o.status === "paid").reduce((s, o) => s + (o.amount ?? 0), 0);
-  const countPaid = (orders ?? []).filter((o) => o.status === "paid").length;
+  const totalReceita = (clientes ?? []).reduce((s, o) => s + (o.valor ?? 0), 0);
+  const uniqueEmails = new Set((clientes ?? []).map((o) => o.email)).size;
 
   return (
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="glass-card rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-primary">{orders?.length ?? 0}</div>
-          <div className="text-xs text-muted-foreground mt-1">Total eventos</div>
+          <div className="text-2xl font-bold text-primary">{clientes?.length ?? 0}</div>
+          <div className="text-xs text-muted-foreground mt-1">Total compras</div>
         </div>
         <div className="glass-card rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{countPaid}</div>
+          <div className="text-2xl font-bold text-green-600">{clientes?.length ?? 0}</div>
           <div className="text-xs text-muted-foreground mt-1">Compras aprovadas</div>
         </div>
         <div className="glass-card rounded-xl p-4 text-center">
           <div className="text-2xl font-bold text-primary">
-            {(totalPaid / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            {totalReceita.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
           </div>
           <div className="text-xs text-muted-foreground mt-1">Receita total</div>
         </div>
         <div className="glass-card rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold">{new Set((orders ?? []).filter((o) => o.status === "paid").map((o) => o.email)).size}</div>
+          <div className="text-2xl font-bold">{uniqueEmails}</div>
           <div className="text-xs text-muted-foreground mt-1">Clientes únicos</div>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Search */}
       <div className="flex gap-3 flex-wrap">
         <Input placeholder="Buscar por nome, email, CPF..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="paid">Pagos</SelectItem>
-            <SelectItem value="pending">Pendentes</SelectItem>
-            <SelectItem value="canceled">Cancelados</SelectItem>
-            <SelectItem value="refunded">Reembolsados</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Table */}
@@ -1345,43 +1425,44 @@ function ClientesManager() {
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/40 text-left">
               <tr>
-                <th className="p-3 font-medium">Cliente</th>
-                <th className="p-3 font-medium">Contato</th>
-                <th className="p-3 font-medium">Oferta</th>
+                <th className="p-3 font-medium">Nome Completo</th>
+                <th className="p-3 font-medium">CPF</th>
+                <th className="p-3 font-medium">Email</th>
+                <th className="p-3 font-medium">Telefone</th>
+                <th className="p-3 font-medium">Produto</th>
+                <th className="p-3 font-medium">Tipo</th>
                 <th className="p-3 font-medium">Valor</th>
-                <th className="p-3 font-medium">Status</th>
                 <th className="p-3 font-medium">Data</th>
+                <th className="p-3 font-medium">Hora</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Nenhum cliente encontrado</td></tr>
+                <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">Nenhum cliente encontrado</td></tr>
               )}
               {filtered.map((o) => (
                 <tr key={o.id} className="border-b hover:bg-muted/20 transition-colors">
-                  <td className="p-3">
-                    <div className="font-medium">{o.name ?? "—"}</div>
-                    {o.cpf && <div className="text-xs text-muted-foreground">CPF: {o.cpf}</div>}
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center gap-1 text-xs"><Mail className="h-3 w-3" />{o.email ?? "—"}</div>
-                    {o.phone && <div className="flex items-center gap-1 text-xs mt-0.5"><Phone className="h-3 w-3" />{o.phone}</div>}
-                  </td>
-                  <td className="p-3 text-xs text-muted-foreground">{o.offer_name ?? o.event}</td>
-                  <td className="p-3 font-medium">
-                    {o.amount != null ? (o.amount / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}
-                  </td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_STYLE[o.status] ?? STATUS_STYLE.unknown}`}>
-                      {STATUS_LABEL[o.status] ?? o.status}
-                    </span>
+                  <td className="p-3 font-medium">{o.nome_completo ?? "—"}</td>
+                  <td className="p-3 text-xs text-muted-foreground">{o.cpf ?? "—"}</td>
+                  <td className="p-3 text-xs">
+                    <div className="flex items-center gap-1"><Mail className="h-3 w-3" />{o.email ?? "—"}</div>
                   </td>
                   <td className="p-3 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1"><Calendar className="h-3 w-3" />
-                      {new Date(o.created_at).toLocaleDateString("pt-BR")}
-                    </div>
-                    <div className="text-[10px]">{new Date(o.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</div>
+                    {o.telefone ? <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{o.telefone}</div> : "—"}
                   </td>
+                  <td className="p-3 text-xs text-muted-foreground">{o.produto ?? "—"}</td>
+                  <td className="p-3">
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${o.tipo_oferta === "Premium" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
+                      {o.tipo_oferta ?? "Básico"}
+                    </span>
+                  </td>
+                  <td className="p-3 font-medium">
+                    {o.valor != null ? o.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1"><Calendar className="h-3 w-3" />{o.data_compra ?? "—"}</div>
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground">{o.hora_compra ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

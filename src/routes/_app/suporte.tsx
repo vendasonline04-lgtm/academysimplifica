@@ -17,8 +17,8 @@ function Suporte() {
           retornaremos o mais rápido possível.
         </p>
         <Button asChild className="gradient-primary text-primary-foreground shadow-glow">
-          <a href="mailto:suporte@academy.app">
-            <Mail className="mr-2 h-4 w-4" /> suporte@academy.app
+          <a href="mailto:contato@simplifica-ai.com">
+            <Mail className="mr-2 h-4 w-4" /> contato@simplifica-ai.com
           </a>
         </Button>
       </div>

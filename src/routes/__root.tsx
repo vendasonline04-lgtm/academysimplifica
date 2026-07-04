@@ -8,6 +8,7 @@ import {
 
 import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
+import { PageLoading } from "@/components/PageLoading";
 
 function NotFoundComponent() {
   return (
@@ -68,6 +69,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: RootComponent,
+  pendingComponent: PageLoading,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });

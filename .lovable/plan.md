@@ -1,39 +1,25 @@
-## Problem
+## Objetivo
 
-Clicking "Ver como Aluno" (or opening any `/modulos/:id` URL without `?aula=...`) crashes with:
+Atualizar apenas a URL do webhook exibida na interface de admin (campo copiável) para apontar para a Edge Function do Supabase.
 
-```
-ZodError: expected nonoptional, received undefined  (path: "aula")
-```
+## Mudança
 
-The route renders the global "This page didn't load" fallback instead of the lesson UI.
-
-## Root cause
-
-In `src/routes/_app/modulos.$id.tsx`:
+Em `src/routes/_app/admin.tsx` (linhas 690-692), substituir:
 
 ```ts
-const searchSchema = z.object({
-  aula: fallback(z.string().optional(), undefined),
-});
+const webhookUrl = typeof window !== "undefined"
+  ? `${window.location.origin}/api/public/cackto/webhook`
+  : "/api/public/cackto/webhook";
 ```
 
-With the current Zod version, `fallback(..., undefined)` produces a non-optional schema, so when `aula` is absent the search-param validator throws and TanStack Router's `VALIDATE_SEARCH` error bubbles up to the root catch boundary — the module page never renders.
-
-## Fix
-
-Replace the search schema with a plain optional string (no `fallback` wrapper):
+Por:
 
 ```ts
-const searchSchema = z.object({
-  aula: z.string().optional(),
-});
+const webhookUrl = "https://lzfqofifjdzcqnglugrc.supabase.co/functions/v1/cackto-webhook";
 ```
 
-That's the only change needed. The rest of the page already handles `aulaParam` being `undefined` (it auto-selects the first lesson).
+## Escopo
 
-## Technical notes
-
-- File touched: `src/routes/_app/modulos.$id.tsx` (lines 21 area only).
-- No changes to `AppSidebar` "Ver como Aluno" link — it correctly points to `/dashboard`; the crash happened because the user was already on a `/modulos/:id` URL with no `aula` search param.
-- No DB, auth, or admin-flow changes.
+- Apenas a string exibida/copiada no admin muda.
+- O endpoint `/api/public/cackto/webhook` no app permanece intacto (sem remoção nem proxy).
+- Nenhuma outra alteração de lógica, rotas ou backend.

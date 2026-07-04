@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, PlayCircle, Check, Heart, Lock, Sparkles, Clock, Menu, X } from "lucide-react";
+import { ArrowLeft, PlayCircle, Check, Heart, Lock, Sparkles, Clock, Menu, X, ClipboardList, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import type { Lesson, Module } from "@/lib/database.types";
+import { SurveyForm } from "@/components/SurveyForm";
 
 declare global { interface Window { __pandaEnded?: () => void; } }
 
@@ -64,6 +65,12 @@ function ModulePage() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [nextModuleId, setNextModuleId] = useState<string | null>(null);
+  const [activeSurveyId, setActiveSurveyId] = useState<string | null>(null);
+  const [surveyGatePopup, setSurveyGatePopup] = useState<{
+    blocked: Lesson;
+    surveyTitle: string;
+    gateLesson: Lesson | null;
+  } | null>(null);
 
   // Load module + lessons
   useEffect(() => {
@@ -105,6 +112,41 @@ function ModulePage() {
       setCompleted(new Set((prog.data ?? []).map((p) => p.lesson_id)));
       setFavorites(new Set((favs.data ?? []).map((f) => f.lesson_id)));
     });
+  }, [lessons, userId]);
+
+  // Carrega pesquisa vinculada à aula ativa
+  useEffect(() => {
+    if (!active?.id) { setActiveSurveyId(null); return; }
+    supabase
+      .from("surveys")
+      .select("id")
+      .eq("lesson_id", active.id)
+      .eq("is_active", true)
+      .maybeSingle()
+      .then(({ data }) => setActiveSurveyId((data as any)?.id ?? null));
+  }, [active?.id]);
+
+  const handleLessonClick = useCallback(async (l: Lesson) => {
+    if (l.survey_gate_survey_id && userId) {
+      const { data: resp } = await supabase
+        .from("survey_responses")
+        .select("id")
+        .eq("survey_id", l.survey_gate_survey_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!resp) {
+        const { data: sv } = await supabase
+          .from("surveys")
+          .select("title, lesson_id")
+          .eq("id", l.survey_gate_survey_id)
+          .maybeSingle();
+        const gateLesson = sv?.lesson_id ? lessons.find((g) => g.id === sv.lesson_id) ?? null : null;
+        setSurveyGatePopup({ blocked: l, surveyTitle: (sv as any)?.title ?? "pesquisa", gateLesson });
+        return;
+      }
+    }
+    setActive(l);
+    setSidebarOpen(false);
   }, [lessons, userId]);
 
   const fireConfetti = useCallback(async () => {
@@ -190,9 +232,9 @@ function ModulePage() {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full gradient-primary shadow-glow">
           <Lock className="h-8 w-8 text-primary-foreground" />
         </div>
-        <h1 className="text-2xl font-bold">{!unlocked ? "Conteúdo em breve" : `Conteúdo ${mod.access_tier === "premium" ? "Premium" : "Básico"}`}</h1>
+        <h1 className="text-2xl font-bold">{!unlocked ? "Conteúdo destrava em breve!" : `Conteúdo ${mod.access_tier === "premium" ? "Premium" : "Básico"}`}</h1>
         <p className="text-muted-foreground text-sm">
-          {!unlocked ? `Este módulo desbloqueia ${mod.unlock_delay_days} dias após o início da sua assinatura.` : "Faça upgrade para acessar este módulo."}
+          {!unlocked ? `Este módulo desbloqueia ${mod.unlock_delay_days} dias após a data da sua compra.` : "Faça upgrade para acessar este módulo."}
         </p>
         {moduleLocked && (
           <Button onClick={() => navigate({ to: "/upgrade" })} className="gradient-primary text-primary-foreground">
@@ -205,21 +247,59 @@ function ModulePage() {
   );
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex flex-1 flex-col overflow-x-hidden w-full">
+      {/* Popup de bloqueio por pesquisa */}
+      {surveyGatePopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-card rounded-2xl shadow-2xl p-8 w-full max-w-md space-y-5 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full gradient-primary shadow-glow">
+              <ClipboardList className="h-8 w-8 text-primary-foreground" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold">Sua opinião é muito importante!</h2>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Para liberar a aula <strong>"{surveyGatePopup.blocked.title}"</strong>, responda a pesquisa{" "}
+                <strong>"{surveyGatePopup.surveyTitle}"</strong>
+                {surveyGatePopup.gateLesson && (
+                  <> da aula <strong>"{surveyGatePopup.gateLesson.title}"</strong></>
+                )}
+                .<br />
+                Assim que responder, o acesso será liberado automaticamente!
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              {surveyGatePopup.gateLesson && (
+                <Button
+                  onClick={() => {
+                    const gate = surveyGatePopup.gateLesson!;
+                    setSurveyGatePopup(null);
+                    setActive(gate);
+                    setSidebarOpen(false);
+                  }}
+                  className="gradient-primary text-primary-foreground gap-2"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  Ir para a pesquisa
+                </Button>
+              )}
+              <Button variant="ghost" onClick={() => setSurveyGatePopup(null)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb */}
-      <div className="border-b border-border/40 bg-background/80 px-4 py-2 backdrop-blur flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm min-w-0">
+      <div className="border-b border-border/40 bg-background/80 px-3 py-2 backdrop-blur flex items-center justify-between w-full overflow-hidden">
+        <div className="flex items-center gap-1 text-sm min-w-0 overflow-hidden">
           <Button asChild variant="ghost" size="sm" className="h-8 px-2 shrink-0">
             <Link to="/dashboard"><ArrowLeft className="mr-1 h-4 w-4" />Início</Link>
           </Button>
-          {(mod as any).category && (
-            <><span className="text-muted-foreground">/</span>
-            <span className="text-muted-foreground truncate max-w-[120px]">{(mod as any).category.title}</span></>
-          )}
-          <span className="text-muted-foreground">/</span>
-          <span className="font-semibold truncate max-w-[160px] sm:max-w-xs">{mod.title}</span>
+          <span className="text-muted-foreground shrink-0">/</span>
+          <span className="font-semibold truncate">{mod.title}</span>
         </div>
-        <button className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium lg:hidden shrink-0" onClick={() => setSidebarOpen((v) => !v)}>
+        <button className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium lg:hidden shrink-0 ml-2" onClick={() => setSidebarOpen((v) => !v)}>
           {sidebarOpen ? <X size={14} /> : <Menu size={14} />}<span>Aulas</span>
         </button>
       </div>
@@ -231,10 +311,10 @@ function ModulePage() {
       ) : (
         <div className="flex flex-1 overflow-hidden">
           {/* Main */}
-          <div className="flex flex-1 flex-col overflow-y-auto">
+          <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
             {/* Video area */}
-            <div className="w-full bg-gradient-to-b from-primary/10 via-primary/5 to-background px-4 pt-5 pb-6">
-              <div className="mx-auto max-w-3xl">
+            <div className="w-full bg-gradient-to-b from-primary/10 via-primary/5 to-background px-3 sm:px-4 pt-4 pb-6">
+              <div className="mx-auto max-w-3xl w-full">
                 {active && (
                   <p className="mb-3 text-xs font-bold uppercase tracking-widest text-primary">
                     Aula {activeIdx + 1} de {lessons.length}
@@ -272,8 +352,8 @@ function ModulePage() {
 
                 {/* Title + action buttons */}
                 {active && (
-                  <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-                    <h2 className="text-lg font-bold sm:text-xl">{active.title}</h2>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+                    <h2 className="text-base font-bold sm:text-xl leading-tight">{active.title}</h2>
                     {!activeLocked && (
                       <div className="flex flex-wrap gap-2">
                         <Button size="sm" onClick={toggleComplete}
@@ -321,6 +401,9 @@ function ModulePage() {
                     <LessonExtras lessonId={active.id} userId={userId} isAdmin={userData?.isAdmin ?? false} hideIfEmpty />
                   </Suspense>
                 )}
+                {!activeLocked && userId && activeSurveyId && (
+                  <SurveyForm surveyId={activeSurveyId} lessonId={active.id} userId={userId} />
+                )}
               </div>
             )}
           </div>
@@ -356,7 +439,7 @@ function ModulePage() {
                     const lLocked = !hasCategoryGrant && !tierAllows(tier, l.access_tier);
                     const done = completed.has(l.id);
                     return (
-                      <button key={l.id} onClick={() => { setActive(l); setSidebarOpen(false); }}
+                      <button key={l.id} onClick={() => handleLessonClick(l)}
                         className={`w-full rounded-xl border p-3 text-left transition-all ${isActive ? "border-primary bg-primary/5 shadow-sm" : "border-border/60 bg-card hover:border-primary/40"}`}>
                         <div className="flex items-start gap-3">
                           <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${done ? "gradient-primary shadow-glow" : isActive ? "bg-primary/20" : "bg-muted"}`}>
