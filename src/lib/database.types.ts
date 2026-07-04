@@ -122,6 +122,16 @@ export interface LessonResource {
   created_at: string;
 }
 
+export interface VideoLibrary {
+  id: string;
+  title: string;
+  panda_embed_url: string;
+  thumbnail_url: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WebhookProduct {
   id: string;
   name: string;
@@ -164,6 +174,7 @@ export interface Database {
       lesson_resources: TableDef<LessonResource>;
       webhook_products: TableDef<WebhookProduct>;
       user_category_access: TableDef<UserCategoryAccess>;
+      video_library: TableDef<VideoLibrary>;
     };
     Views: Record<string, never>;
     Enums: {

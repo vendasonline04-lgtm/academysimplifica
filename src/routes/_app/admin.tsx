@@ -16,12 +16,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Calendar, GripVertical, ChevronUp, ChevronDown, Webhook, Copy, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Upload, Folder, BookOpen, PlayCircle, Link2, Send, Pencil, Users, Phone, Mail, DollarSign, Calendar, GripVertical, ChevronUp, ChevronDown, Webhook, Copy, CheckCircle2, Video, Search, Library } from "lucide-react";
 import { toast } from "sonner";
-import type { AccessTier, AppRole, Category, Module, Lesson, UserSubscription, Profile, WebhookProduct } from "@/lib/database.types";
+import type { AccessTier, AppRole, Category, Module, Lesson, UserSubscription, Profile, WebhookProduct, VideoLibrary } from "@/lib/database.types";
 
 const adminSearchSchema = z.object({
-  tab: z.enum(["content", "subs", "clientes", "webhook", "view"]).optional(),
+  tab: z.enum(["content", "subs", "clientes", "webhook", "view", "biblioteca"]).optional(),
 });
 
 export const Route = createFileRoute("/_app/admin")({
@@ -44,12 +44,14 @@ function AdminPage() {
       <Tabs defaultValue={tab ?? "content"}>
         <TabsList>
           <TabsTrigger value="content">Conteúdo</TabsTrigger>
+          <TabsTrigger value="biblioteca">Biblioteca</TabsTrigger>
           <TabsTrigger value="subs">Assinaturas</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
           <TabsTrigger value="webhook">Webhook</TabsTrigger>
           <TabsTrigger value="view">Visualização</TabsTrigger>
         </TabsList>
         <TabsContent value="content" className="mt-6"><ContentManager /></TabsContent>
+        <TabsContent value="biblioteca" className="mt-6"><VideoLibraryManager /></TabsContent>
         <TabsContent value="subs" className="mt-6"><SubscriptionsManager /></TabsContent>
         <TabsContent value="clientes" className="mt-6"><ClientesManager /></TabsContent>
         <TabsContent value="webhook" className="mt-6"><WebhookManager /></TabsContent>
@@ -406,10 +408,23 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
   const [title, setTitle] = useState(lesson.title);
   const [desc, setDesc] = useState(lesson.description ?? "");
   const [published, setPublished] = useState(lesson.published);
-  const [videoMode, setVideoMode] = useState<"url" | "embed">(
+  const [videoMode, setVideoMode] = useState<"url" | "embed" | "biblioteca">(
     lesson.panda_embed_url?.startsWith("<") ? "embed" : "url"
   );
   const [videoVal, setVideoVal] = useState(lesson.panda_embed_url ?? "");
+  const [libSearch, setLibSearch] = useState("");
+
+  const { data: libraryVideos = [] } = useQuery({
+    queryKey: ["video-library"],
+    queryFn: async () => {
+      const { data } = await supabase.from("video_library" as any).select("*").order("created_at", { ascending: false });
+      return (data ?? []) as VideoLibrary[];
+    },
+  });
+
+  const filteredLibrary = libraryVideos.filter((v) =>
+    !libSearch || v.title.toLowerCase().includes(libSearch.toLowerCase())
+  );
   const [tier, setTier] = useState<AccessTier>(lesson.access_tier);
 
   // Materials
@@ -481,12 +496,62 @@ function LessonEditor({ lesson, onDone }: { lesson: Lesson; onDone: () => void }
         <Label>Vídeo da aula</Label>
         <div className="flex rounded-md border overflow-hidden text-sm">
           <button onClick={() => setVideoMode("url")} className={`flex-1 py-1.5 transition ${videoMode === "url" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>URL</button>
-          <button onClick={() => setVideoMode("embed")} className={`flex-1 py-1.5 transition ${videoMode === "embed" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>Incorporar (Embed)</button>
+          <button onClick={() => setVideoMode("embed")} className={`flex-1 py-1.5 transition ${videoMode === "embed" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>Embed</button>
+          <button onClick={() => setVideoMode("biblioteca")} className={`flex-1 py-1.5 transition flex items-center justify-center gap-1 ${videoMode === "biblioteca" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
+            <Library className="h-3 w-3" /> Biblioteca
+          </button>
         </div>
-        {videoMode === "url" ? (
+
+        {videoMode === "url" && (
           <Input value={videoVal} onChange={(e) => setVideoVal(e.target.value)} placeholder="https://player-vz-....tv.pandavideo.com.br/embed/?v=..." />
-        ) : (
+        )}
+        {videoMode === "embed" && (
           <Textarea value={videoVal} onChange={(e) => setVideoVal(e.target.value)} rows={4} placeholder={'<iframe id="panda-..." src="https://..." ...></iframe>'} className="font-mono text-xs" />
+        )}
+        {videoMode === "biblioteca" && (
+          <div className="space-y-2 rounded-lg border p-3 bg-muted/20">
+            {videoVal && (
+              <div className="flex items-center gap-2 rounded-md border bg-primary/5 border-primary/20 px-3 py-2 text-sm">
+                <Video className="h-4 w-4 text-primary shrink-0" />
+                <span className="flex-1 truncate text-primary font-medium">Vídeo selecionado da biblioteca</span>
+                <button onClick={() => setVideoVal("")} className="text-muted-foreground hover:text-destructive text-xs">trocar</button>
+              </div>
+            )}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input placeholder="Buscar na biblioteca..." value={libSearch} onChange={(e) => setLibSearch(e.target.value)} className="pl-9 h-8 text-sm" />
+            </div>
+            <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
+              {filteredLibrary.length === 0 && (
+                <p className="text-center text-xs text-muted-foreground py-4">Nenhum vídeo encontrado na biblioteca</p>
+              )}
+              {filteredLibrary.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => setVideoVal(v.panda_embed_url)}
+                  className={`w-full flex items-center gap-3 rounded-lg border p-2.5 text-left text-sm transition-colors ${
+                    videoVal === v.panda_embed_url
+                      ? "border-primary bg-primary/5 text-primary font-medium"
+                      : "hover:border-primary/40 hover:bg-muted/40"
+                  }`}
+                >
+                  {v.thumbnail_url ? (
+                    <img src={v.thumbnail_url} alt="" className="h-10 w-16 rounded object-cover shrink-0" />
+                  ) : (
+                    <div className="h-10 w-16 rounded bg-muted flex items-center justify-center shrink-0">
+                      <Video className="h-4 w-4 text-muted-foreground opacity-40" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate font-medium text-xs">{v.title}</p>
+                    {v.description && <p className="truncate text-[10px] text-muted-foreground">{v.description}</p>}
+                  </div>
+                  {videoVal === v.panda_embed_url && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
@@ -571,6 +636,181 @@ function CategoryEditor({ category, onDone }: { category: Category; onDone: () =
         <Button onClick={save} className="gradient-primary text-primary-foreground">Salvar</Button>
         <Button variant="ghost" onClick={onDone}>Cancelar</Button>
       </div>
+    </div>
+  );
+}
+
+/* ------------------- Video Library Manager ------------------- */
+
+function VideoLibraryManager() {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [editing, setEditing] = useState<Partial<VideoLibrary> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  const { data: videos = [], isLoading } = useQuery({
+    queryKey: ["video-library"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("video_library" as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as VideoLibrary[];
+    },
+  });
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["video-library"] });
+
+  const filtered = videos.filter((v) =>
+    !search || v.title.toLowerCase().includes(search.toLowerCase()) || (v.description ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const saveVideo = async () => {
+    if (!editing || !editing.title?.trim() || !editing.panda_embed_url?.trim()) return;
+    setSaving(true);
+    try {
+      if (editing.id) {
+        const { error } = await supabase.from("video_library" as any)
+          .update({ title: editing.title, panda_embed_url: editing.panda_embed_url, thumbnail_url: editing.thumbnail_url ?? null, description: editing.description ?? null })
+          .eq("id", editing.id);
+        if (error) throw error;
+        toast.success("Vídeo atualizado!");
+      } else {
+        const { error } = await supabase.from("video_library" as any)
+          .insert({ title: editing.title, panda_embed_url: editing.panda_embed_url, thumbnail_url: editing.thumbnail_url ?? null, description: editing.description ?? null });
+        if (error) throw error;
+        toast.success("Vídeo adicionado à biblioteca!");
+      }
+      setEditing(null);
+      invalidate();
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteVideo = async (id: string) => {
+    const { error } = await supabase.from("video_library" as any).delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Vídeo removido da biblioteca!");
+    setConfirmDelete(null);
+    invalidate();
+  };
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      {confirmDelete && (
+        <ConfirmModal
+          message="Remover este vídeo da biblioteca? As aulas que usam este vídeo não serão afetadas."
+          onConfirm={() => deleteVideo(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold flex items-center gap-2"><Library className="h-4 w-4 text-primary" /> Biblioteca de Vídeos</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Cadastre seus vídeos aqui e reutilize em qualquer aula.</p>
+        </div>
+        <Button onClick={() => setEditing({ title: "", panda_embed_url: "", thumbnail_url: "", description: "" })} className="gradient-primary text-primary-foreground">
+          <Plus className="mr-1 h-4 w-4" /> Novo Vídeo
+        </Button>
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Buscar vídeo..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      </div>
+
+      {isLoading && <div className="text-sm text-muted-foreground">Carregando biblioteca...</div>}
+
+      {!isLoading && filtered.length === 0 && (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed py-16 text-sm text-muted-foreground">
+          <Video className="h-10 w-10 opacity-20" />
+          <span>{search ? "Nenhum vídeo encontrado" : "Biblioteca vazia — adicione seu primeiro vídeo"}</span>
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {filtered.map((v) => (
+          <div key={v.id} className="rounded-xl border bg-white shadow-sm overflow-hidden">
+            {v.thumbnail_url ? (
+              <img src={v.thumbnail_url} alt={v.title} className="w-full h-32 object-cover" />
+            ) : (
+              <div className="w-full h-32 bg-muted flex items-center justify-center">
+                <Video className="h-8 w-8 text-muted-foreground opacity-30" />
+              </div>
+            )}
+            <div className="p-3 space-y-1.5">
+              <p className="font-medium text-sm leading-tight">{v.title}</p>
+              {v.description && <p className="text-xs text-muted-foreground line-clamp-2">{v.description}</p>}
+              <p className="text-[10px] text-muted-foreground">{new Date(v.created_at).toLocaleDateString("pt-BR")}</p>
+              <div className="flex gap-1 pt-1">
+                <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => setEditing(v)}>
+                  <Pencil className="h-3 w-3 mr-1" /> Editar
+                </Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setConfirmDelete(v.id)}>
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold">{editing.id ? "Editar Vídeo" : "Novo Vídeo"}</h3>
+
+            <div className="space-y-1.5">
+              <Label>Título do vídeo</Label>
+              <Input autoFocus value={editing.title ?? ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} placeholder="Ex: Aula 01 — Introdução ao ChatGPT" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>URL ou Embed do Panda Video</Label>
+              <div className="flex rounded-md border overflow-hidden text-sm mb-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing({ ...editing, panda_embed_url: "" })}
+                  className={`flex-1 py-1.5 transition ${!(editing.panda_embed_url ?? "").startsWith("<") ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >URL</button>
+                <button
+                  type="button"
+                  onClick={() => setEditing({ ...editing, panda_embed_url: "" })}
+                  className={`flex-1 py-1.5 transition ${(editing.panda_embed_url ?? "").startsWith("<") ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                >Embed</button>
+              </div>
+              {(editing.panda_embed_url ?? "").startsWith("<") ? (
+                <Textarea value={editing.panda_embed_url ?? ""} onChange={(e) => setEditing({ ...editing, panda_embed_url: e.target.value })} rows={4} placeholder={'<iframe id="panda-..." src="https://..." ...></iframe>'} className="font-mono text-xs" />
+              ) : (
+                <Input value={editing.panda_embed_url ?? ""} onChange={(e) => setEditing({ ...editing, panda_embed_url: e.target.value })} placeholder="https://player-vz-....tv.pandavideo.com.br/embed/?v=..." />
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>URL da miniatura (opcional)</Label>
+              <Input value={editing.thumbnail_url ?? ""} onChange={(e) => setEditing({ ...editing, thumbnail_url: e.target.value })} placeholder="https://..." />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Descrição (opcional)</Label>
+              <Textarea value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} rows={2} placeholder="Breve descrição do vídeo..." />
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t">
+              <Button disabled={!editing.title?.trim() || !editing.panda_embed_url?.trim() || saving} onClick={saveVideo} className="gradient-primary text-primary-foreground flex-1">
+                {saving ? "Salvando..." : editing.id ? "Salvar Alterações" : "Adicionar à Biblioteca"}
+              </Button>
+              <Button variant="ghost" onClick={() => setEditing(null)}>Cancelar</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
